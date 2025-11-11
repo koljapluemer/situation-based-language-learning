@@ -1,12 +1,5 @@
 <script setup lang="ts">
-import { getCurrentInstance } from 'vue';
-import { provideRepositories } from './injectRepositories';
-import ToastContainer from './dumb/toasts/ToastContainer.vue';
-
-const app = getCurrentInstance()?.appContext.app;
-if (app) {
-  provideRepositories(app);
-}
+import ToastContainer from '../dumb/toasts/ToastContainer.vue';
 </script>
 
 <template>
