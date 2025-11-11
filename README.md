@@ -49,6 +49,9 @@ Frontends (Vue 3 + Vite):
 - `npm run cms:dev` / `npm run cram:dev` – Vite dev servers (ports 4173 & 4174)
 - `npm run cms:build` / `npm run cram:build` – type-check + bundle
 - `npm run cms:preview` / `npm run cram:preview` – preview production bundles
+- Install dependencies in one workspace without affecting others via npm’s `--workspace` flag. Examples:
+  - `npm install some-lib --workspace @sbl/frontend-cms`
+  - `npm install -D @types/some-lib --workspace @sbl/backend`
 
 > All backend/frontend scripts automatically run `npm run shared:build` first so the shared package outputs stay in sync.
 
