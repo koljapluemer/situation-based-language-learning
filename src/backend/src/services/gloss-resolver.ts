@@ -1,7 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import { GlossDTO } from "../../shared/dto/GlossDTO";
-import { LanguageCode } from "../../shared/Language";
-import { Note } from "../../shared/Note";
+import { GlossDTO, LanguageCode, Note } from "@sbl/shared";
 import { prisma as defaultClient } from "../lib/prisma";
 
 const glossInclude = {
@@ -148,7 +146,7 @@ export class GlossResolver {
     }
 
     if (Array.isArray(notes)) {
-      return notes as Note[];
+      return notes as unknown as Note[];
     }
 
     return [];

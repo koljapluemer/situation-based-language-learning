@@ -1,9 +1,12 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import { SituationDTO } from "../../shared/dto/SituationDTO";
-import { ChallengeOfExpression } from "../../shared/ChallengeOfExpression";
-import { ChallengeOfUnderstandingText } from "../../shared/ChallengeOfUnderstandingText";
-import { LanguageCode } from "../../shared/Language";
-import { LocalizedString } from "../../shared/LocalizedString";
+import {
+  ChallengeOfExpression,
+  ChallengeOfUnderstandingText,
+  GlossDTO,
+  LanguageCode,
+  LocalizedString,
+  SituationDTO,
+} from "@sbl/shared";
 import { prisma as defaultClient } from "../lib/prisma";
 import {
   SituationQueryInput,
@@ -12,7 +15,6 @@ import {
 } from "../schemas/situation-schema";
 import { GlossResolver } from "./gloss-resolver";
 import { ConflictError, NotFoundError } from "../utils/http-error";
-import { GlossDTO } from "../../shared/dto/GlossDTO";
 
 const situationInclude = {
   challengesOfExpression: {
@@ -257,7 +259,7 @@ export class SituationService {
 
   private parseDescriptions(descriptions: Prisma.JsonValue): LocalizedString[] {
     if (Array.isArray(descriptions)) {
-      return descriptions as LocalizedString[];
+      return descriptions as unknown as LocalizedString[];
     }
 
     return [];

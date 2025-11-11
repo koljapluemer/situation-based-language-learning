@@ -1,5 +1,5 @@
+import { LANGUAGES, LanguageCode } from "@sbl/shared";
 import { z } from "zod";
-import { LANGUAGES, LanguageCode } from "../../shared/Language";
 
 const languageCodeValues = Object.keys(LANGUAGES) as [LanguageCode, ...LanguageCode[]];
 

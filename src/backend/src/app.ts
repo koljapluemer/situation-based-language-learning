@@ -17,7 +17,7 @@ export function buildApp() {
     if (error instanceof ZodError) {
       return reply.status(400).send({
         error: "Validation error",
-        details: error.errors,
+        details: error.issues,
       });
     }
 

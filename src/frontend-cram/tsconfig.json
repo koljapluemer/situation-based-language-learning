@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "moduleResolution": "Bundler",
+    "module": "ESNext",
+    "jsx": "preserve",
+    "allowSyntheticDefaultImports": true,
+    "types": ["vite/client"],
+    "baseUrl": "./"
+  },
+  "include": ["./**/*"],
+  "exclude": ["dist", "node_modules"]
+}

@@ -1,33 +1,32 @@
 {
   "name": "situation-based-language-learning",
   "version": "1.0.0",
-  "description": "",
-  "license": "ISC",
+  "private": true,
+  "description": "Monorepo for the Situation-Based Language Learning project",
   "author": "",
-  "type": "commonjs",
-  "main": "eslint.config.js",
+  "license": "ISC",
+  "workspaces": [
+    "src/backend",
+    "src/frontend-cms",
+    "src/frontend-cram",
+    "src/shared"
+  ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "backend:dev": "ts-node-dev --respawn --transpile-only --project src/backend/tsconfig.json src/backend/src/server.ts",
-    "backend:build": "tsc -p src/backend/tsconfig.json",
-    "backend:start": "node src/backend/dist/server.js",
-    "prisma:generate": "prisma generate --schema src/backend/prisma/schema.prisma",
-    "prisma:migrate:dev": "prisma migrate dev --schema src/backend/prisma/schema.prisma",
-    "prisma:migrate:deploy": "prisma migrate deploy --schema src/backend/prisma/schema.prisma",
-    "prisma:seed": "tsx src/backend/prisma/seed.ts"
-  },
-  "dependencies": {
-    "@fastify/cors": "^11.1.0",
-    "@prisma/client": "^6.19.0",
-    "dotenv": "^17.2.3",
-    "fastify": "^5.6.2",
-    "zod": "^4.1.12"
-  },
-  "devDependencies": {
-    "@types/node": "^22.10.1",
-    "prisma": "^6.19.0",
-    "ts-node-dev": "^2.0.0",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "shared:build": "npm run build --workspace @sbl/shared",
+    "shared:dev": "npm run dev --workspace @sbl/shared",
+    "backend:dev": "npm run shared:build && npm run dev --workspace @sbl/backend",
+    "backend:build": "npm run shared:build && npm run build --workspace @sbl/backend",
+    "backend:start": "npm run shared:build && npm run start --workspace @sbl/backend",
+    "prisma:generate": "npm run prisma:generate --workspace @sbl/backend",
+    "prisma:migrate:dev": "npm run prisma:migrate:dev --workspace @sbl/backend",
+    "prisma:migrate:deploy": "npm run prisma:migrate:deploy --workspace @sbl/backend",
+    "prisma:seed": "npm run prisma:seed --workspace @sbl/backend",
+    "cms:dev": "npm run shared:build && npm run dev --workspace @sbl/frontend-cms",
+    "cms:build": "npm run shared:build && npm run build --workspace @sbl/frontend-cms",
+    "cms:preview": "npm run shared:build && npm run preview --workspace @sbl/frontend-cms",
+    "cram:dev": "npm run shared:build && npm run dev --workspace @sbl/frontend-cram",
+    "cram:build": "npm run shared:build && npm run build --workspace @sbl/frontend-cram",
+    "cram:preview": "npm run shared:build && npm run preview --workspace @sbl/frontend-cram"
   }
 }

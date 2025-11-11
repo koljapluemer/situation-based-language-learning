@@ -2,26 +2,27 @@
 
 FROM node:20-bullseye AS deps
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+COPY tsconfig.base.json ./tsconfig.base.json
+COPY src/backend/package*.json ./src/backend/
+RUN cd src/backend && npm install
 
 FROM node:20-bullseye AS builder
 WORKDIR /app
-COPY package*.json ./
-COPY --from=deps /app/node_modules ./node_modules
-COPY tsconfig.base.json ./
-COPY src ./src
+COPY tsconfig.base.json ./tsconfig.base.json
+COPY src/shared ./src/shared
+COPY src/backend ./src/backend
+COPY --from=deps /app/src/backend/node_modules ./src/backend/node_modules
+WORKDIR /app/src/backend
 RUN npm run prisma:generate
-RUN npm run backend:build
+RUN npm run build
+RUN npm prune --omit=dev
 
 FROM node:20-bullseye AS runner
 ENV NODE_ENV=production
-WORKDIR /app
-COPY package*.json ./
-COPY --from=deps /app/node_modules ./node_modules
-RUN npm prune --omit=dev
-COPY --from=builder /app/src/backend/dist ./src/backend/dist
-COPY --from=builder /app/src/backend/prisma ./src/backend/prisma
-COPY --from=builder /app/src/shared ./src/shared
+WORKDIR /app/src/backend
+COPY --from=builder /app/src/backend/dist ./dist
+COPY --from=builder /app/src/backend/prisma ./prisma
+COPY --from=builder /app/src/backend/node_modules ./node_modules
+COPY --from=builder /app/src/shared ../shared
 EXPOSE 3333
-CMD ["node", "src/backend/dist/server.js"]
+CMD ["node", "dist/server.js"]

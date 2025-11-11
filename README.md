@@ -1,110 +1,103 @@
-# Situation-Based Language Learning Backend
+# Situation-Based Language Learning Monorepo
 
-This repository now contains a Fastify + Prisma backend that persists situations, glosses, and their expression/understanding challenges. It exposes a REST API that always returns fully resolved gloss data according to the resolution rules you specified (recursive `contains`, depth-1 for `nearSynonyms`, `nearHomophones`, and `translations`).
+This repository now uses **plain npm workspaces** to keep the backend, multiple Vue/Vite frontends, and the shared DTO library in sync while preserving one set of type definitions in `src/shared`.
 
-## Tech Stack
+```
+.
+├── package.json                # workspace orchestrator
+└── src
+    ├── backend                 # Fastify + Prisma API
+    ├── frontend-cms            # Vue 3 + Vite app (content tooling)
+    ├── frontend-cram           # Vue 3 + Vite app (learner UX)
+    └── shared                  # DTOs, types, and cross-app utilities
+```
 
-- **Runtime:** Node.js 20 LTS
-- **Framework:** Fastify 5 with Zod-powered validation
-- **ORM:** Prisma with PostgreSQL (see `src/backend/prisma/schema.prisma`)
-- **Documentation & Tooling:** Dockerfile, docker-compose, Prisma seed script
+## Getting Started
 
-## Local Development
-
-1. **Install dependencies** (only needed when modules change):
+1. **Install dependencies once at the repo root** (regenerates the workspace-aware `package-lock.json`):
    ```bash
    npm install
    ```
-2. **Bootstrap environment variables:**
+2. **Copy backend environment variables**:
    ```bash
    cp src/backend/.env.example src/backend/.env
    ```
-3. **Start Postgres locally (optional but easiest):**
+3. **Start Postgres locally (optional but easiest)**:
    ```bash
    docker compose -f src/backend/docker-compose.yml up -d
    ```
-4. **Create the database schema & generate the Prisma client:**
-   ```bash
-   npm run prisma:migrate:dev
-   npm run prisma:seed   # optional demo data
-   npm run prisma:generate
-   ```
-5. **Run the backend in watch mode:**
-   ```bash
-   npm run backend:dev
-   ```
 
-Additional scripts:
+> The root `package.json` only proxies scripts into each workspace. For example `npm run backend:dev` simply forwards to `@sbl/backend`’s `npm run dev`.
 
-- `npm run backend:build` – compile TypeScript to `src/backend/dist`
+### Useful Scripts
+
+Shared DTO package:
+
+- `npm run shared:build` – compile `@sbl/shared` into `src/shared/dist`
+- `npm run shared:dev` – watch mode for editing shared types/constants
+
+Backend:
+
+- `npm run backend:dev` – Fastify + Prisma server with ts-node-dev
+- `npm run backend:build` – emit JS to `src/backend/dist`
 - `npm run backend:start` – run the compiled server
-- `npm run prisma:migrate:deploy` – apply migrations in production
+- `npm run prisma:migrate:dev` / `npm run prisma:migrate:deploy` – apply DB migrations
+- `npm run prisma:seed` – optional demo data
 
-## REST API Overview
+Frontends (Vue 3 + Vite):
 
-The API lives under `http://localhost:3333` by default.
+- `npm run cms:dev` / `npm run cram:dev` – Vite dev servers (ports 4173 & 4174)
+- `npm run cms:build` / `npm run cram:build` – type-check + bundle
+- `npm run cms:preview` / `npm run cram:preview` – preview production bundles
+
+> All backend/frontend scripts automatically run `npm run shared:build` first so the shared package outputs stay in sync.
+
+Shared DTO Library:
+
+- `src/shared` now has its own package manifest (`@sbl/shared`), build pipeline, and index barrel so that all apps import the same compiled TypeScript definitions (emitted into `src/shared/dist`). Use `npm run shared:dev` if you want the shared types to rebuild on save while developing.
+
+## Backend Notes
+
+- **Stack:** Fastify 5, Prisma ORM, PostgreSQL, Zod validation, Dockerized for production.
+- **Recursive DTO rules:** `contains` glosses resolve infinitely; `nearSynonyms`, `nearHomophones`, and `translations` resolve depth-1.
+- **Challenges:** `ChallengeOfExpression` / `ChallengeOfUnderstandingText` stored as first-class tables and returned with resolved gloss payloads.
+
+### REST Surface (`http://localhost:3333`)
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| GET | `/health` | Simple readiness probe |
-| GET | `/glosses` | Optional `language` & `content` filters |
-| POST | `/glosses` | Body validated by `glossWriteSchema`; relation fields expect gloss IDs |
-| GET | `/glosses/:id` | Returns a fully resolved `GlossDTO` |
-| PATCH | `/glosses/:id` | Partial updates, relation arrays replace previous values |
-| DELETE | `/glosses/:id` | Removes a gloss |
-| GET | `/situations?language=deu` | `language` query param is required (used only for DTO projection) |
-| GET | `/situations/:id?language=deu` | Same language requirement |
-| POST | `/situations` | `language` field is required in the payload but **not** persisted; it selects the projection language |
-| PATCH | `/situations/:id?language=deu` | Replaces any challenge array that is provided |
-| DELETE | `/situations/:id` | Cascades to its challenges |
+| GET | `/health` | readiness probe |
+| GET | `/glosses` | optional `language`, `content` filters |
+| POST | `/glosses` | create gloss + relationships via IDs |
+| GET | `/glosses/:id` | returns fully resolved `GlossDTO` |
+| PATCH | `/glosses/:id` | partial updates, arrays replace previous values |
+| DELETE | `/glosses/:id` | remove gloss |
+| GET | `/situations?language=deu` | language param required for DTO projection |
+| GET | `/situations/:id?language=deu` | fetch resolved situation |
+| POST | `/situations` | create situation + challenges |
+| PATCH | `/situations/:id?language=deu` | replace any provided challenge arrays |
+| DELETE | `/situations/:id` | cascades to its challenges |
 
-### Gloss Resolution Rules
+### Production
 
-- `contains` – recursively resolved to unlimited depth. Each nested gloss includes its own `contains` tree.
-- `nearSynonyms`, `nearHomophones`, `translations` – resolved exactly one level deep. The related gloss is included with its metadata, but its own relation arrays are empty.
-- Every `GlossDTO` now includes an `id`, `language`, `content`, and metadata arrays so the frontend can re-use them directly.
+- Build the API image: `docker build -f src/backend/Dockerfile -t sbll-backend .`
+- Run migrations before deploy: `npm run prisma:migrate:deploy`
+- Provide `DATABASE_URL` via environment (managed Postgres recommended)
+- Start compiled server inside the container with `npm run backend:start`
 
-### Challenge Persistence
+## Frontend Notes
 
-`ChallengeOfExpression` and `ChallengeOfUnderstandingText` are first-class tables linked to `Situation`. Their payloads reference glosses by ID (`glossIds`). Responses include the resolved `GlossDTO[]` objects used in each challenge.
+- Both `frontend-cms` and `frontend-cram` are Vue 3 + Vite shells with the correct dependencies, TypeScript config, and aliasing back to `src/shared`.
+- Each app can evolve independently (separate `package.json`, scripts, and future env files) while still sharing DTOs/interfaces from the workspace.
 
-## Production Deployment Notes
+## Shared DTOs
 
-- Build a container image with the provided Dockerfile:
-  ```bash
-  docker build -f src/backend/Dockerfile -t sbll-backend .
-  ```
-- Run migrations before each deploy: `npm run prisma:migrate:deploy`
-- Provide a managed PostgreSQL URL via `DATABASE_URL`.
-- Start the app with `npm run backend:start` (or `node src/backend/dist/server.js`).
-
-## Folder Structure Highlights
-
-```
-src/backend/
-  ├── docker-compose.yml         # local Postgres + pgAdmin
-  ├── Dockerfile                 # production-ready multi-stage build
-  ├── prisma/
-  │   ├── schema.prisma          # domain models
-  │   └── seed.ts                # optional seed data
-  └── src/
-      ├── app.ts / server.ts     # Fastify bootstrap
-      ├── env.ts                 # dotenv + Zod config
-      ├── routes/                # health, glosses, situations
-      ├── services/              # Prisma-backed business logic
-      ├── schemas/               # Zod validators for REST payloads
-      └── utils/                 # shared helpers (e.g., HttpError)
-```
-
-## Working With Situations & Glosses
-
-- Use the `/glosses` endpoints to create glosses first. Reference relationships by gloss ID.
-- Create situations with descriptive metadata plus expression/understanding challenges that reference existing gloss IDs.
-- When fetching situations, always pass `language` as a query parameter; it is only used for DTO serialization and is not stored in the database.
-- The API always returns DTOs defined under `src/shared`, so the frontend and backend share a single contract.
+- `src/shared/index.ts` re-exports the DTOs/types so every workspace consumes the same contract.
+- Interfaces remain the single source of truth for REST payloads; backend services already import them directly, and the Vue apps can point at the same definitions.
 
 ## Next Steps
 
-- Add automated tests around the resolver logic and route handlers.
-- Extend filtering/pagination on listing endpoints before loading large datasets.
-- Consider caching resolved gloss graphs if situations become very large.
+1. Re-run `npm install` at the root to regenerate a workspace-aware `package-lock.json`.
+2. Flesh out the Vue apps (pages, components, env configs) now that their scaffolding is in place.
+3. Consider adding automated tests per workspace (e.g., Vitest for frontends, Jest/Tap for backend).
+4. Extend CI/CD to call the workspace scripts (`npm run backend:build`, `npm run cms:build`, etc.) before deployments.

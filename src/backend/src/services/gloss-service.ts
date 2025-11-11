@@ -1,7 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import { GlossDTO } from "../../shared/dto/GlossDTO";
+import { GlossDTO, LanguageCode } from "@sbl/shared";
 import { GlossWriteInput, GlossUpdateInput } from "../schemas/gloss-schema";
-import { LanguageCode } from "../../shared/Language";
 import { prisma as defaultClient } from "../lib/prisma";
 import { GlossResolver } from "./gloss-resolver";
 import { ConflictError, NotFoundError } from "../utils/http-error";
