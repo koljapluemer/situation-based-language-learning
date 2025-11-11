@@ -2,10 +2,8 @@ import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { SituationService } from "../services/situation-service";
 import { situationQuerySchema, situationUpdateSchema, situationWriteSchema } from "../schemas/situation-schema";
-import { languageCodeSchema } from "../schemas/common";
 
 const paramsSchema = z.object({ id: z.string().cuid() });
-const languageQuerySchema = z.object({ language: languageCodeSchema });
 const service = new SituationService();
 
 export function registerSituationRoutes(app: FastifyInstance) {
@@ -16,8 +14,7 @@ export function registerSituationRoutes(app: FastifyInstance) {
 
   app.get("/situations/:id", async (request) => {
     const { id } = paramsSchema.parse(request.params);
-    const { language } = languageQuerySchema.parse(request.query);
-    return { data: await service.findById(id, { language }) };
+    return { data: await service.findById(id, {}) };
   });
 
   app.post("/situations", async (request, reply) => {
@@ -28,10 +25,9 @@ export function registerSituationRoutes(app: FastifyInstance) {
 
   app.patch("/situations/:id", async (request) => {
     const { id } = paramsSchema.parse(request.params);
-    const { language } = languageQuerySchema.parse(request.query);
     const payload = situationUpdateSchema.parse(request.body);
     return {
-      data: await service.update(id, payload, language),
+      data: await service.update(id, payload),
     };
   });
 

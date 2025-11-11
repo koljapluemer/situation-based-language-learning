@@ -49,7 +49,7 @@ export class SituationService {
       });
 
       const glossMap = await this.resolveGlossesForSituation(situation);
-      return this.toDTO(situation, payload.language, glossMap);
+      return this.toDTO(situation, glossMap);
     } catch (error) {
       this.handlePrismaError(error, payload.identifier);
       throw error;
@@ -58,8 +58,7 @@ export class SituationService {
 
   async update(
     id: string,
-    payload: SituationUpdateInput,
-    language: LanguageCode
+    payload: SituationUpdateInput
   ): Promise<SituationDTO> {
     await this.ensureExists(id);
 
@@ -109,7 +108,7 @@ export class SituationService {
         }
       });
 
-      return this.findById(id, { language });
+      return this.findById(id, {});
     } catch (error) {
       this.handlePrismaError(error, payload.identifier);
       throw error;
@@ -132,7 +131,7 @@ export class SituationService {
     }
 
     const glossMap = await this.resolveGlossesForSituation(situation);
-    return this.toDTO(situation, query.language, glossMap);
+    return this.toDTO(situation, glossMap);
   }
 
   async list(query: SituationQueryInput): Promise<SituationDTO[]> {
@@ -151,7 +150,7 @@ export class SituationService {
     situations.forEach((situation) => this.collectGlossIds(situation, glossIds));
     const glossMap = await this.resolver.resolveByIds(Array.from(glossIds));
 
-    return situations.map((situation) => this.toDTO(situation, query.language, glossMap));
+    return situations.map((situation) => this.toDTO(situation, glossMap));
   }
 
   private connectGlosses(ids: string[]) {
@@ -192,13 +191,11 @@ export class SituationService {
 
   private toDTO(
     situation: SituationWithRelations,
-    language: LanguageCode,
     glossMap: Map<string, GlossDTO>
   ): SituationDTO {
     const descriptions = this.parseDescriptions(situation.descriptions);
 
     return {
-      language,
       identifier: situation.identifier,
       descriptions,
       challengesOfExpression: situation.challengesOfExpression.map((challenge) =>

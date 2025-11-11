@@ -38,7 +38,7 @@ Shared DTO package:
 
 Backend:
 
-- `npm run backend:dev` – Fastify + Prisma server with ts-node-dev
+- `npm run backend:dev` – Fastify + Prisma server with ts-node-dev (rebuilds shared DTOs automatically)
 - `npm run backend:build` – emit JS to `src/backend/dist`
 - `npm run backend:start` – run the compiled server
 - `npm run prisma:migrate:dev` / `npm run prisma:migrate:deploy` – apply DB migrations
