@@ -92,6 +92,7 @@ Shared DTO Library:
 
 - Both `frontend-cms` and `frontend-cram` are Vue 3 + Vite shells with the correct dependencies, TypeScript config, and aliasing back to `src/shared`.
 - Each app can evolve independently (separate `package.json`, scripts, and future env files) while still sharing DTOs/interfaces from the workspace.
+- When running against a remote backend, set `VITE_API_URL` in the corresponding frontend `.env` files (defaults to `http://localhost:3333` during development).
 
 ## Shared DTOs
 
