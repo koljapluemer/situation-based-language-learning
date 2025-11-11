@@ -1,6 +1,6 @@
-import { GlossIdentfier } from "./LocalizedString";
+import { GlossDTO } from "./dto/GlossDTO";
 
 export interface ChallengeOfExpression {
-  glosses: GlossIdentfier[];
+  glosses: GlossDTO[];
   prompt: string;
 }

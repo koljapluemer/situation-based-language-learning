@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum LanguageCode {
+  deu
+  arz
+  arb
+  apc
+  cmn
+  fra
+  spa
+  uzb
+}
+
+model Situation {
+  id        String   @id @default(cuid())
+  identifier String  @unique
+  descriptions Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  challengesOfExpression    ChallengeOfExpression[]
+  challengesOfUnderstanding ChallengeOfUnderstandingText[]
+}
+
+model Gloss {
+  id             String   @id @default(cuid())
+  language       LanguageCode
+  content        String
+  isParaphrased  Boolean  @default(false)
+  transcriptions String[] @default([])
+  notes          Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  contains    Gloss[] @relation("GlossContains")
+  containedBy Gloss[] @relation("GlossContains")
+
+  nearSynonyms    Gloss[] @relation("GlossNearSynonyms")
+  synonymousWith  Gloss[] @relation("GlossNearSynonyms")
+
+  nearHomophones Gloss[] @relation("GlossNearHomophones")
+  homophoneOf    Gloss[] @relation("GlossNearHomophones")
+
+  translations Gloss[] @relation("GlossTranslations")
+  translatedBy Gloss[] @relation("GlossTranslations")
+
+  expressionChallenges    ChallengeOfExpression[]      @relation("ExpressionGlosses")
+  understandingChallenges ChallengeOfUnderstandingText[] @relation("UnderstandingGlosses")
+
+  @@unique([language, content])
+}
+
+model ChallengeOfExpression {
+  id          String   @id @default(cuid())
+  prompt      String
+  situationId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  situation Situation @relation(fields: [situationId], references: [id], onDelete: Cascade)
+  glosses   Gloss[]   @relation("ExpressionGlosses")
+}
+
+model ChallengeOfUnderstandingText {
+  id          String   @id @default(cuid())
+  text        String
+  language    LanguageCode
+  situationId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  situation Situation @relation(fields: [situationId], references: [id], onDelete: Cascade)
+  glosses   Gloss[]   @relation("UnderstandingGlosses")
+}

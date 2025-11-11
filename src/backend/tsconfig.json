@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "moduleResolution": "NodeNext",
+    "rootDir": "src",
+    "outDir": "dist",
+    "resolveJsonModule": true,
+    "sourceMap": true,
+    "types": ["node"],
+    "baseUrl": "./src"
+  },
+  "include": ["src/**/*", "../shared/**/*", "prisma/seed.ts"],
+  "exclude": ["dist", "node_modules"]
+}

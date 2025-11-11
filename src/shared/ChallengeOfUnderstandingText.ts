@@ -1,8 +1,8 @@
-import { GlossIdentfier } from "./LocalizedString";
+import { GlossDTO } from "./dto/GlossDTO";
 import { LanguageCode } from "./Language";
 
 export interface ChallengeOfUnderstandingText {
-    glosses: GlossIdentfier[]
+    glosses: GlossDTO[]
     text: string
     language: LanguageCode
 }
