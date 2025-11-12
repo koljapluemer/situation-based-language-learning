@@ -79,7 +79,8 @@ export class SituationService {
               payload.challengesOfExpression.map((challenge) =>
                 tx.challengeOfExpression.create({
                   data: {
-                    prompt: challenge.prompt,
+                    identifier: challenge.identifier,
+                    prompts: challenge.prompts,
                     situationId: id,
                     glosses: this.connectGlosses(challenge.glossIds),
                   },
@@ -169,7 +170,8 @@ export class SituationService {
 
     return {
       create: payload.challengesOfExpression.map((challenge) => ({
-        prompt: challenge.prompt,
+        identifier: challenge.identifier,
+        prompts: challenge.prompts,
         glosses: this.connectGlosses(challenge.glossIds),
       })),
     } satisfies Prisma.ChallengeOfExpressionCreateNestedManyWithoutSituationInput;
@@ -212,7 +214,8 @@ export class SituationService {
     glossMap: Map<string, GlossDTO>
   ): ChallengeOfExpression {
     return {
-      prompt: challenge.prompt,
+      identifier: challenge.identifier,
+      prompts: this.parseLocalizedStrings(challenge.prompts),
       glosses: challenge.glosses.map((gloss) => this.pickGloss(gloss.id, glossMap)),
     };
   }
@@ -255,10 +258,13 @@ export class SituationService {
   }
 
   private parseDescriptions(descriptions: Prisma.JsonValue): LocalizedString[] {
-    if (Array.isArray(descriptions)) {
-      return descriptions as unknown as LocalizedString[];
-    }
+    return this.parseLocalizedStrings(descriptions);
+  }
 
+  private parseLocalizedStrings(value: Prisma.JsonValue): LocalizedString[] {
+    if (Array.isArray(value)) {
+      return value as unknown as LocalizedString[];
+    }
     return [];
   }
 

@@ -3,8 +3,17 @@ import { languageCodeSchema, localizedStringSchema } from "./common";
 
 const glossIdArray = z.array(z.string().cuid()).default([]);
 
+const localizedPromptArray = z
+  .array(localizedStringSchema)
+  .min(1)
+  .refine(
+    (prompts) => prompts.some((prompt) => prompt.language === "eng"),
+    "At least one English prompt is required"
+  );
+
 export const challengeOfExpressionWriteSchema = z.object({
-  prompt: z.string().min(1),
+  identifier: z.string().min(1),
+  prompts: localizedPromptArray,
   glossIds: glossIdArray,
 });
 

@@ -191,7 +191,11 @@ Body schema (`situationWriteSchema`):
   ],
   "challengesOfExpression": [
     {
-      "prompt": "Saluda a un amigo",
+      "identifier": "saluda-a-un-amigo",
+      "prompts": [
+        { "language": "eng", "content": "Greet a friend" },
+        { "language": "spa", "content": "Saluda a un amigo" }
+      ],
       "glossIds": ["clfj5q3d900001s8l2i9s8kdw"]
     }
   ],
@@ -208,6 +212,7 @@ Body schema (`situationWriteSchema`):
 Notes:
 
 - `language` in the payload is used only to shape the response.
+- Expression challenges must include at least one English prompt; additional languages are optional.
 - Challenge arrays default to `[]`; omit them to create empty situations.
 
 ### Update

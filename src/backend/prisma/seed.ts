@@ -57,7 +57,11 @@ async function main() {
       challengesOfExpression: {
         create: [
           {
-            prompt: "Saluda a un amigo",
+            identifier: "saluda-a-un-amigo",
+            prompts: [
+              { language: "eng", content: "Greet a friend" },
+              { language: "spa", content: "Saluda a un amigo" },
+            ],
             glosses: { connect: [{ id: hello.id }, { id: question.id }] },
           },
         ],

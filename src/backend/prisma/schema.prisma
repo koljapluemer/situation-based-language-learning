@@ -50,13 +50,16 @@ model Gloss {
 
 model ChallengeOfExpression {
   id          String   @id @default(cuid())
-  prompt      String
+  identifier  String
+  prompts     Json
   situationId String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   situation Situation @relation(fields: [situationId], references: [identifier], onDelete: Cascade)
   glosses   Gloss[]   @relation("ExpressionGlosses")
+
+  @@unique([situationId, identifier])
 }
 
 model ChallengeOfUnderstandingText {

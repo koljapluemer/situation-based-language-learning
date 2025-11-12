@@ -5,6 +5,7 @@ import { Eye } from "lucide-vue-next";
 import ModalCreateSituation from "../../features/situation-create/ModalCreateSituation.vue";
 import { useModalCreateSituation } from "../../features/situation-create/index";
 import { useToast } from "../../dumb/toasts/index";
+import { slugify } from "../../dumb/slug";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3333";
 
@@ -36,7 +37,7 @@ async function loadSituations() {
 }
 
 async function handleCreateSituation(description: string) {
-  const identifier = description.toLowerCase().replace(/\s+/g, "-");
+  const identifier = slugify(description);
 
   try {
     const response = await fetch(`${API_BASE_URL}/situations`, {

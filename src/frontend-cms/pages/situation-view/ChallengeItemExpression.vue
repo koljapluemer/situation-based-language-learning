@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import { Pencil, Trash2, X, Check } from "lucide-vue-next";
-import type { ChallengeOfExpression, SituationDTO } from "@sbl/shared";
+import type { ChallengeOfExpression, ChallengeOfExpressionWriteInput, LocalizedString, SituationDTO } from "@sbl/shared";
 import { useToast } from "../../dumb/toasts/index";
 
 const props = defineProps<{
@@ -21,7 +21,15 @@ const toast = useToast();
 const queryClient = useQueryClient();
 
 const isEditing = ref(false);
-const editedPrompt = ref(props.challenge.prompt);
+const ENGLISH_LANGUAGE = "eng";
+const englishPrompt = computed(() => getEnglishPrompt(props.challenge));
+const editedPrompt = ref(englishPrompt.value);
+
+watch(englishPrompt, (value) => {
+  if (!isEditing.value) {
+    editedPrompt.value = value;
+  }
+});
 
 // Delete mutation
 const deleteMutation = useMutation({
@@ -31,7 +39,7 @@ const deleteMutation = useMutation({
 
     const updatedChallenges = situation.challengesOfExpression
       .filter((_, i) => i !== props.index)
-      .map(c => ({ prompt: c.prompt, glossIds: [] }));
+      .map(toChallengeWritePayload);
 
     const response = await fetch(`${API_BASE_URL}/situations/${props.situationId}?language=eng`, {
       method: "PATCH",
@@ -65,9 +73,16 @@ const updateMutation = useMutation({
     const situation = queryClient.getQueryData<SituationDTO>(["situation", props.situationId]);
     if (!situation) throw new Error("Situation not found in cache");
 
-    const updatedChallenges = situation.challengesOfExpression.map((c, i) =>
-      i === props.index ? { prompt: newPrompt, glossIds: [] } : { prompt: c.prompt, glossIds: [] }
-    );
+    const updatedChallenges: ChallengeOfExpressionWriteInput[] = situation.challengesOfExpression.map((c, i) => {
+      if (i === props.index) {
+        return {
+          identifier: c.identifier,
+          prompts: updateEnglishPrompt(clonePrompts(c.prompts), newPrompt),
+          glossIds: c.glosses.map((gloss) => gloss.id),
+        };
+      }
+      return toChallengeWritePayload(c);
+    });
 
     const response = await fetch(`${API_BASE_URL}/situations/${props.situationId}?language=eng`, {
       method: "PATCH",
@@ -107,13 +122,13 @@ function handleDelete() {
 }
 
 function startEdit() {
-  editedPrompt.value = props.challenge.prompt;
+  editedPrompt.value = englishPrompt.value;
   isEditing.value = true;
 }
 
 function cancelEdit() {
   isEditing.value = false;
-  editedPrompt.value = props.challenge.prompt;
+  editedPrompt.value = englishPrompt.value;
 }
 
 function saveEdit() {
@@ -121,12 +136,41 @@ function saveEdit() {
     updateMutation.mutate(editedPrompt.value.trim());
   }
 }
+
+function getEnglishPrompt(challenge: ChallengeOfExpression): string {
+  return (
+    challenge.prompts.find((prompt) => prompt.language === ENGLISH_LANGUAGE)?.content ?? ""
+  );
+}
+
+function toChallengeWritePayload(challenge: ChallengeOfExpression): ChallengeOfExpressionWriteInput {
+  return {
+    identifier: challenge.identifier,
+    prompts: clonePrompts(challenge.prompts),
+    glossIds: challenge.glosses.map((gloss) => gloss.id),
+  };
+}
+
+function clonePrompts(prompts: LocalizedString[]): LocalizedString[] {
+  return prompts.map((prompt) => ({ ...prompt }));
+}
+
+function updateEnglishPrompt(prompts: LocalizedString[], content: string): LocalizedString[] {
+  const existingIndex = prompts.findIndex((prompt) => prompt.language === ENGLISH_LANGUAGE);
+  if (existingIndex === -1) {
+    return [...prompts, { language: ENGLISH_LANGUAGE, content }];
+  }
+
+  return prompts.map((prompt, index) =>
+    index === existingIndex ? { ...prompt, content } : prompt
+  );
+}
 </script>
 
 <template>
   <div class="flex items-center gap-2 py-2 px-3 hover:bg-base-200 border-l border-base-300">
     <div v-if="!isEditing" class="flex-1">
-      <span class="text-sm">{{ challenge.prompt }}</span>
+      <span class="text-sm">{{ englishPrompt }}</span>
     </div>
     <div v-else class="flex-1 flex items-center gap-2">
       <input

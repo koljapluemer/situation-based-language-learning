@@ -1,6 +1,14 @@
 import { GlossDTO } from "./dto/GlossDTO";
+import { LocalizedString } from "./LocalizedString";
 
 export interface ChallengeOfExpression {
+  identifier: string;
+  prompts: LocalizedString[];
   glosses: GlossDTO[];
-  prompt: string;
+}
+
+export interface ChallengeOfExpressionWriteInput {
+  identifier: string;
+  prompts: LocalizedString[];
+  glossIds: string[];
 }
