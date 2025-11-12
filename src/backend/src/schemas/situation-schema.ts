@@ -27,6 +27,7 @@ export const situationWriteSchema = z.object({
   identifier: z.string().min(1),
   descriptions: z.array(localizedStringSchema).min(1),
   imageLink: z.string().url().optional(),
+  targetLanguage: languageCodeSchema,
   challengesOfExpression: z.array(challengeOfExpressionWriteSchema).default([]),
   challengesOfUnderstandingText: z
     .array(challengeOfUnderstandingTextWriteSchema)
@@ -37,12 +38,14 @@ export const situationUpdateSchema = z.object({
   identifier: z.string().min(1).optional(),
   descriptions: z.array(localizedStringSchema).min(1).optional(),
   imageLink: z.string().url().optional(),
+  targetLanguage: languageCodeSchema.optional(),
   challengesOfExpression: z.array(challengeOfExpressionWriteSchema).optional(),
   challengesOfUnderstandingText: z.array(challengeOfUnderstandingTextWriteSchema).optional(),
 });
 
 export const situationQuerySchema = z.object({
   identifier: z.string().optional(),
+  targetLanguage: languageCodeSchema.optional(),
 });
 
 export type SituationWriteInput = z.infer<typeof situationWriteSchema>;

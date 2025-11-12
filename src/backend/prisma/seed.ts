@@ -51,9 +51,11 @@ async function main() {
     create: {
       identifier: "greeting-basic",
       descriptions: [
+        { language: "eng", content: "Basic greetings" },
         { language: "spa", content: "Primeros saludos" },
         { language: "deu", content: "Erste Grüße" },
       ],
+      targetLanguage: "spa",
       challengesOfExpression: {
         create: [
           {

@@ -49,8 +49,20 @@ interface SituationDTO {
   identifier: string;
   descriptions: LocalizedString[];
   imageLink?: string;
+  targetLanguage: LanguageCode;
   challengesOfExpression: ChallengeOfExpression[];
   challengesOfUnderstandingText: ChallengeOfUnderstandingText[];
+}
+
+interface SituationSummaryDTO {
+  identifier: string;
+  descriptions: LocalizedString[];
+  imageLink?: string;
+  targetLanguage: LanguageCode;
+  challengeCount: {
+    expression: number;
+    understanding: number;
+  };
 }
 ```
 
@@ -177,7 +189,7 @@ Zod returns:
 ### List
 
 ```
-GET /situations?identifier=greeting-basic
+GET /situations?identifier=greeting-basic&targetLanguage=spa
 ```
 
 Query parameters:
@@ -185,8 +197,26 @@ Query parameters:
 | Param | Required | Description |
 | --- | --- | --- |
 | `identifier` | Optional | Filter by identifier. |
+| `targetLanguage` | Optional | Filter by target language code (e.g., "spa", "deu"). |
 
 Response: `{ "data": [SituationDTO, ...] }`.
+
+### List Summary
+
+```
+GET /situations/summary?targetLanguage=spa
+```
+
+Returns lightweight situation summaries without full challenge/gloss data. Ideal for list views.
+
+Query parameters:
+
+| Param | Required | Description |
+| --- | --- | --- |
+| `identifier` | Optional | Filter by identifier. |
+| `targetLanguage` | Optional | Filter by target language code (e.g., "spa", "deu"). |
+
+Response: `{ "data": [SituationSummaryDTO, ...] }`.
 
 ### Retrieve
 
@@ -210,10 +240,11 @@ Body schema (`situationWriteSchema`):
 {
   "identifier": "greeting-basic",
   "descriptions": [
-    { "language": "spa", "content": "Primeros saludos" },
+    { "language": "eng", "content": "Basic greetings" },
     { "language": "deu", "content": "Erste Grüße" }
   ],
   "imageLink": "https://example.com/images/greeting.jpg",
+  "targetLanguage": "spa",
   "challengesOfExpression": [
     {
       "identifier": "saluda-a-un-amigo",
@@ -236,8 +267,9 @@ Body schema (`situationWriteSchema`):
 
 Notes:
 
+- `targetLanguage` is required and specifies the language being learned (e.g., "spa" for Spanish situations).
 - `imageLink` is optional and must be a valid URL if provided.
-- `language` in the payload is used only to shape the response.
+- `descriptions` should include UI-friendly text in multiple languages to describe the situation.
 - Expression challenges must include at least one English prompt; additional languages are optional.
 - Challenge arrays default to `[]`; omit them to create empty situations.
 - Glosses are unique per `(language, content)`. When a matching entry already exists, attach its `id` instead of creating a duplicate (`/glosses/search` helps surface candidates).

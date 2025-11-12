@@ -1,29 +1,33 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { type LanguageCode } from "@sbl/shared";
 import { useModalCreateSituation } from "./index";
+import LanguageSelect from "../../dumb/LanguageSelect.vue";
 
 const { isOpen, close } = useModalCreateSituation();
 
 const emit = defineEmits<{
-  create: [description: string, imageLink?: string];
+  create: [description: string, targetLanguage: LanguageCode, imageLink?: string];
 }>();
 
 const description = ref("");
+const targetLanguage = ref<LanguageCode>("" as LanguageCode);
 const imageLink = ref("");
 const isSubmitting = ref(false);
 
 function handleSubmit() {
   const trimmed = description.value.trim();
-  if (!trimmed) return;
+  if (!trimmed || !targetLanguage.value) return;
 
   isSubmitting.value = true;
   const imageLinkValue = imageLink.value.trim() || undefined;
-  emit("create", trimmed, imageLinkValue);
+  emit("create", trimmed, targetLanguage.value, imageLinkValue);
 }
 
 function handleClose() {
   if (isSubmitting.value) return;
   description.value = "";
+  targetLanguage.value = "" as LanguageCode;
   imageLink.value = "";
   close();
 }
@@ -32,6 +36,7 @@ function handleClose() {
 function handleModalClose() {
   if (!isOpen.value) {
     description.value = "";
+    targetLanguage.value = "" as LanguageCode;
     imageLink.value = "";
     isSubmitting.value = false;
   }
@@ -59,6 +64,16 @@ function handleModalClose() {
           </fieldset>
 
           <fieldset class="fieldset">
+            <label for="target-language" class="label">Target Language (language being learned)</label>
+            <LanguageSelect
+              id="target-language"
+              v-model="targetLanguage"
+              :disabled="isSubmitting"
+              required
+            />
+          </fieldset>
+
+          <fieldset class="fieldset">
             <label for="image-link" class="label">Image URL (optional)</label>
             <input
               id="image-link"
@@ -82,7 +97,7 @@ function handleModalClose() {
             <button
               type="submit"
               class="btn btn-primary"
-              :disabled="!description.trim() || isSubmitting"
+              :disabled="!description.trim() || !targetLanguage || isSubmitting"
             >
               <span v-if="isSubmitting" class="loading loading-spinner loading-sm"></span>
               {{ isSubmitting ? "Creating..." : "Create" }}

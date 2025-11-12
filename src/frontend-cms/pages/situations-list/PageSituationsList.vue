@@ -36,7 +36,7 @@ async function loadSituations() {
   }
 }
 
-async function handleCreateSituation(description: string, imageLink?: string) {
+async function handleCreateSituation(description: string, targetLanguage: string, imageLink?: string) {
   const identifier = slugify(description);
 
   try {
@@ -53,6 +53,7 @@ async function handleCreateSituation(description: string, imageLink?: string) {
             content: description,
           },
         ],
+        targetLanguage,
         imageLink,
         challengesOfExpression: [],
         challengesOfUnderstandingText: [],

@@ -6,6 +6,7 @@ import {
   LanguageCode,
   LocalizedString,
   SituationDTO,
+  SituationSummaryDTO,
 } from "@sbl/shared";
 import { prisma as defaultClient } from "../lib/prisma";
 import {
@@ -43,6 +44,7 @@ export class SituationService {
           identifier: payload.identifier,
           descriptions: payload.descriptions,
           imageLink: payload.imageLink,
+          targetLanguage: payload.targetLanguage,
           challengesOfExpression: this.buildExpressionChallengeCreate(payload),
           challengesOfUnderstanding: this.buildUnderstandingChallengeCreate(payload),
         },
@@ -69,6 +71,7 @@ export class SituationService {
         if (payload.identifier) data.identifier = payload.identifier;
         if (payload.descriptions) data.descriptions = payload.descriptions as Prisma.JsonArray;
         if (payload.imageLink !== undefined) data.imageLink = payload.imageLink;
+        if (payload.targetLanguage) data.targetLanguage = payload.targetLanguage;
 
         if (Object.keys(data).length) {
           await tx.situation.update({ where: { identifier: id }, data });
@@ -142,6 +145,9 @@ export class SituationService {
     if (query.identifier) {
       where.identifier = query.identifier;
     }
+    if (query.targetLanguage) {
+      where.targetLanguage = query.targetLanguage;
+    }
 
     const situations = await this.client.situation.findMany({
       where,
@@ -154,6 +160,44 @@ export class SituationService {
     const glossMap = await this.resolver.resolveByIds(Array.from(glossIds));
 
     return situations.map((situation) => this.toDTO(situation, glossMap));
+  }
+
+  async listSummary(query: SituationQueryInput): Promise<SituationSummaryDTO[]> {
+    const where: Prisma.SituationWhereInput = {};
+    if (query.identifier) {
+      where.identifier = query.identifier;
+    }
+    if (query.targetLanguage) {
+      where.targetLanguage = query.targetLanguage;
+    }
+
+    const situations = await this.client.situation.findMany({
+      where,
+      select: {
+        identifier: true,
+        descriptions: true,
+        imageLink: true,
+        targetLanguage: true,
+        _count: {
+          select: {
+            challengesOfExpression: true,
+            challengesOfUnderstanding: true,
+          },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    return situations.map((situation) => ({
+      identifier: situation.identifier,
+      descriptions: this.parseDescriptions(situation.descriptions),
+      imageLink: situation.imageLink ?? undefined,
+      targetLanguage: situation.targetLanguage as LanguageCode,
+      challengeCount: {
+        expression: situation._count.challengesOfExpression,
+        understanding: situation._count.challengesOfUnderstanding,
+      },
+    }));
   }
 
   private connectGlosses(ids: string[]) {
@@ -203,6 +247,7 @@ export class SituationService {
       identifier: situation.identifier,
       descriptions,
       imageLink: situation.imageLink ?? undefined,
+      targetLanguage: situation.targetLanguage as LanguageCode,
       challengesOfExpression: situation.challengesOfExpression.map((challenge) =>
         this.mapExpressionChallenge(challenge, glossMap)
       ),

@@ -40,9 +40,26 @@ onMounted(() => {
         <div class="card-actions">
           <router-link
             :to="{ name: 'known-languages-setup' }"
-            class="btn btn-primary btn-sm"
+            class="btn btn-outline btn-sm"
           >
             {{ hasLanguages ? 'Edit Languages' : 'Set Up Languages' }}
+          </router-link>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow">
+      <div class="card-body">
+        <h2 class="card-title">Practice</h2>
+        <p class="text-sm text-base-content/70">
+          Browse and practice language learning situations
+        </p>
+        <div class="card-actions">
+          <router-link
+            :to="{ name: 'situations' }"
+            class="btn btn-primary"
+          >
+            Browse Situations
           </router-link>
         </div>
       </div>

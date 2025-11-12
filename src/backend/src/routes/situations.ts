@@ -7,6 +7,11 @@ const paramsSchema = z.object({ id: z.string().min(1) }); // identifier (e.g., "
 const service = new SituationService();
 
 export function registerSituationRoutes(app: FastifyInstance) {
+  app.get("/situations/summary", async (request) => {
+    const query = situationQuerySchema.parse(request.query);
+    return { data: await service.listSummary(query) };
+  });
+
   app.get("/situations", async (request) => {
     const query = situationQuerySchema.parse(request.query);
     return { data: await service.list(query) };
