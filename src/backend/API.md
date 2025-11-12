@@ -189,7 +189,7 @@ Zod returns:
 ### List
 
 ```
-GET /situations?identifier=greeting-basic&targetLanguage=spa
+GET /situations?identifier=greeting-basic&targetLanguage=spa&nativeLanguages=eng,deu
 ```
 
 Query parameters:
@@ -198,13 +198,14 @@ Query parameters:
 | --- | --- | --- |
 | `identifier` | Optional | Filter by identifier. |
 | `targetLanguage` | Optional | Filter by target language code (e.g., "spa", "deu"). |
+| `nativeLanguages` | Optional | Comma-separated list of user's native languages (e.g., "eng,deu"). When provided, returns only ONE prompt per challenge (best matching language from the priority list, or English fallback), and filters glosses to only include target language + native languages. |
 
 Response: `{ "data": [SituationDTO, ...] }`.
 
 ### List Summary
 
 ```
-GET /situations/summary?targetLanguage=spa
+GET /situations/summary?targetLanguage=spa&nativeLanguages=eng,deu
 ```
 
 Returns lightweight situation summaries without full challenge/gloss data. Ideal for list views.
@@ -215,16 +216,23 @@ Query parameters:
 | --- | --- | --- |
 | `identifier` | Optional | Filter by identifier. |
 | `targetLanguage` | Optional | Filter by target language code (e.g., "spa", "deu"). |
+| `nativeLanguages` | Optional | Comma-separated list of user's native languages (currently unused in summary endpoint, but accepted for consistency). |
 
 Response: `{ "data": [SituationSummaryDTO, ...] }`.
 
 ### Retrieve
 
 ```
-GET /situations/:id
+GET /situations/:id?nativeLanguages=eng,deu
 ```
 
 Where `:id` is the situation identifier (e.g., `greeting-basic`), not a cuid.
+
+Query parameters:
+
+| Param | Required | Description |
+| --- | --- | --- |
+| `nativeLanguages` | Optional | Comma-separated list of user's native languages (e.g., "eng,deu"). When provided, returns only ONE prompt per challenge (best matching language from the priority list, or English fallback), and filters glosses to only include target language + native languages. |
 
 Response is `{ "data": SituationDTO }`.
 

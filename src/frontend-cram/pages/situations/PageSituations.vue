@@ -3,6 +3,9 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { LANGUAGES, type LanguageCode, type SituationSummaryDTO } from '@sbl/shared';
 import { getKnownLanguages } from '../../dumb/known-languages-storage';
+import { downloadSituation, downloadAllSituations } from '../../features/situation-download';
+import { situationExists } from '../../entities/situation';
+import { Download } from 'lucide-vue-next';
 
 const route = useRoute();
 const router = useRouter();
@@ -12,6 +15,10 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3333';
 const situations = ref<SituationSummaryDTO[]>([]);
 const isLoading = ref(false);
 const error = ref<string | null>(null);
+const downloadingIdentifier = ref<string | null>(null);
+const downloadingAll = ref(false);
+const downloadProgress = ref({ current: 0, total: 0 });
+const downloadedSituations = ref<Set<string>>(new Set());
 
 // Get active tab from URL query param or default to first known language
 const activeTab = computed({
@@ -74,11 +81,83 @@ function getPreferredDescription(situation: SituationSummaryDTO): string {
 function getTotalChallenges(situation: SituationSummaryDTO): number {
   return situation.challengeCount.expression + situation.challengeCount.understanding;
 }
+
+// Check which situations are already downloaded
+async function checkDownloadedSituations() {
+  const downloaded = new Set<string>();
+  for (const situation of situations.value) {
+    const exists = await situationExists(situation.identifier);
+    if (exists) {
+      downloaded.add(situation.identifier);
+    }
+  }
+  downloadedSituations.value = downloaded;
+}
+
+// Download a single situation
+async function handleDownloadSituation(identifier: string) {
+  downloadingIdentifier.value = identifier;
+  error.value = null;
+
+  try {
+    const nativeLanguages = getKnownLanguages();
+    await downloadSituation(identifier, nativeLanguages);
+    downloadedSituations.value.add(identifier);
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Download failed';
+  } finally {
+    downloadingIdentifier.value = null;
+  }
+}
+
+// Download all situations for current language
+async function handleDownloadAll() {
+  downloadingAll.value = true;
+  error.value = null;
+  downloadProgress.value = { current: 0, total: 0 };
+
+  try {
+    const nativeLanguages = getKnownLanguages();
+    await downloadAllSituations(
+      activeTab.value,
+      nativeLanguages,
+      (current, total) => {
+        downloadProgress.value = { current, total };
+      }
+    );
+    // Refresh downloaded status
+    await checkDownloadedSituations();
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Download failed';
+  } finally {
+    downloadingAll.value = false;
+    downloadProgress.value = { current: 0, total: 0 };
+  }
+}
+
+// Watch situations changes to check download status
+watch(situations, () => {
+  checkDownloadedSituations();
+}, { deep: true });
 </script>
 
 <template>
   <section class="space-y-6">
-    <h1>Practice Situations</h1>
+    <div class="flex items-center justify-between">
+      <h1>Practice Situations</h1>
+      <button
+        v-if="situations.length > 0"
+        @click="handleDownloadAll"
+        :disabled="downloadingAll || isLoading"
+        class="btn btn-outline btn-sm gap-2"
+      >
+        <Download :size="16" />
+        <span v-if="!downloadingAll">Download All</span>
+        <span v-else>
+          Downloading {{ downloadProgress.current }}/{{ downloadProgress.total }}
+        </span>
+      </button>
+    </div>
 
     <!-- Language Tabs -->
     <div role="tablist" class="tabs tabs-boxed">
@@ -130,7 +209,25 @@ function getTotalChallenges(situation: SituationSummaryDTO): number {
           <p class="text-sm text-base-content/70">
             {{ getTotalChallenges(situation) }} challenge{{ getTotalChallenges(situation) !== 1 ? 's' : '' }}
           </p>
-          <div class="card-actions justify-end">
+          <div class="card-actions justify-end gap-2">
+            <button
+              v-if="!downloadedSituations.has(situation.identifier)"
+              @click="handleDownloadSituation(situation.identifier)"
+              :disabled="downloadingIdentifier === situation.identifier"
+              class="btn btn-ghost btn-sm gap-1"
+              title="Download for offline use"
+            >
+              <Download :size="14" />
+              <span v-if="downloadingIdentifier !== situation.identifier">Download</span>
+              <span v-else class="loading loading-spinner loading-xs"></span>
+            </button>
+            <span
+              v-else
+              class="badge badge-success badge-sm gap-1"
+              title="Available offline"
+            >
+              Downloaded
+            </span>
             <button class="btn btn-primary btn-sm">Start</button>
           </div>
         </div>

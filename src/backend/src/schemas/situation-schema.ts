@@ -46,6 +46,18 @@ export const situationUpdateSchema = z.object({
 export const situationQuerySchema = z.object({
   identifier: z.string().optional(),
   targetLanguage: languageCodeSchema.optional(),
+  nativeLanguages: z.preprocess(
+    (val) => {
+      if (typeof val === 'string') {
+        return val.split(',').map(s => s.trim());
+      }
+      if (Array.isArray(val)) {
+        return val;
+      }
+      return undefined;
+    },
+    z.array(languageCodeSchema).optional()
+  ),
 });
 
 export type SituationWriteInput = z.infer<typeof situationWriteSchema>;

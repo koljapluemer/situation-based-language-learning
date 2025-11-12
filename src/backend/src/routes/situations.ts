@@ -19,7 +19,8 @@ export function registerSituationRoutes(app: FastifyInstance) {
 
   app.get("/situations/:id", async (request) => {
     const { id } = paramsSchema.parse(request.params);
-    return { data: await service.findById(id, {}) };
+    const query = situationQuerySchema.parse(request.query);
+    return { data: await service.findById(id, query) };
   });
 
   app.post("/situations", async (request, reply) => {
