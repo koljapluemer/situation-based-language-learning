@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import type { SituationDTO } from "@sbl/shared";
+import ModalCreateSituation from "../../features/situation-create/ModalCreateSituation.vue";
+import { useModalCreateSituation } from "../../features/situation-create/index";
+import { useToast } from "../../dumb/toasts/index";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3333";
 
 const situations = ref<SituationDTO[]>([]);
 const isLoading = ref(true);
 const errorMessage = ref<string | null>(null);
+
+const { open, close } = useModalCreateSituation();
+const toast = useToast();
 
 async function loadSituations() {
   isLoading.value = true;
@@ -28,6 +34,46 @@ async function loadSituations() {
   }
 }
 
+async function handleCreateSituation(description: string) {
+  const identifier = description.toLowerCase().replace(/\s+/g, "-");
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/situations`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        identifier,
+        descriptions: [
+          {
+            language: "eng",
+            content: description,
+          },
+        ],
+        challengesOfExpression: [],
+        challengesOfUnderstandingText: [],
+      }),
+    });
+
+    if (!response.ok) {
+      if (response.status === 409) {
+        throw new Error("A situation with this identifier already exists");
+      }
+      throw new Error(`Request failed with status ${response.status}`);
+    }
+
+    toast.success("Situation created successfully");
+    close();
+    await loadSituations();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    toast.error(`Failed to create situation: ${message}`);
+  } finally {
+    close();
+  }
+}
+
 onMounted(loadSituations);
 </script>
 
@@ -35,9 +81,14 @@ onMounted(loadSituations);
   <section class="space-y-4">
     <header class="flex items-center justify-between gap-4">
       <h1>Situations</h1>
-      <button class="btn btn-outline btn-sm" type="button" @click="loadSituations" :disabled="isLoading">
-        Refresh
-      </button>
+      <div class="flex gap-2">
+        <button class="btn btn-primary btn-sm" type="button" @click="open">
+          Create Situation
+        </button>
+        <button class="btn btn-outline btn-sm" type="button" @click="loadSituations" :disabled="isLoading">
+          Refresh
+        </button>
+      </div>
     </header>
 
     <div v-if="errorMessage" role="alert" class="alert alert-error">
@@ -81,5 +132,7 @@ onMounted(loadSituations);
         </tbody>
       </table>
     </div>
+
+    <ModalCreateSituation @create="handleCreateSituation" />
   </section>
 </template>

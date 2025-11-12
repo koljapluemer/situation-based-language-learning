@@ -7,6 +7,7 @@ export const LANGUAGES = {
   fra: { name: "French", emoji: "🇫🇷" },
   spa: { name: "Spanish", emoji: "🇪🇸" },
   uzb: { name: "Uzbek", emoji: "🇺🇿" },
+  eng: { name: "English"}
 } as const;
 
 export type LanguageCode = keyof typeof LANGUAGES;
