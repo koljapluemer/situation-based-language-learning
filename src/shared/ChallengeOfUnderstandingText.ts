@@ -2,7 +2,13 @@ import { GlossDTO } from "./dto/GlossDTO";
 import { LanguageCode } from "./Language";
 
 export interface ChallengeOfUnderstandingText {
-    glosses: GlossDTO[]
-    text: string
-    language: LanguageCode
+    text: string;
+    language: LanguageCode;
+    glosses: GlossDTO[];
+}
+
+export interface ChallengeOfUnderstandingTextWriteInput {
+    text: string;
+    language: LanguageCode;
+    glossIds: string[];
 }
