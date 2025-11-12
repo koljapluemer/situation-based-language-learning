@@ -247,6 +247,11 @@ function updateEnglishPrompt(prompts: LocalizedString[], content: string): Local
 
   return prompts.map((prompt, index) => (index === existingIndex ? { ...prompt, content } : prompt));
 }
+
+function formatGlossContent(gloss: GlossDTO): string {
+  const base = gloss.content || "—";
+  return gloss.isParaphrased ? `[${base}]` : base;
+}
 </script>
 
 <template>
@@ -255,75 +260,62 @@ function updateEnglishPrompt(prompts: LocalizedString[], content: string): Local
       <summary class="flex items-center gap-2 py-2 px-3 cursor-pointer hover:bg-base-200 list-none">
         <ChevronRight :size="16" class="group-open:hidden" />
         <ChevronDown :size="16" class="hidden group-open:block" />
-        <div class="flex flex-col">
-          <span class="font-medium">{{ englishPrompt || "Untitled expression challenge" }}</span>
-          <span class="text-xs text-light">{{ challenge.identifier }}</span>
-        </div>
-        <span class="text-xs text-light ml-auto">
-          {{ challenge.glosses.length }} gloss{{ challenge.glosses.length === 1 ? "" : "es" }}
+        <span class="flex-1 text-sm">
+          {{ englishPrompt || "Untitled expression challenge" }}
         </span>
+        <div class="flex items-center gap-1 ml-auto">
+          <button
+            type="button"
+            class="btn btn-ghost btn-xs"
+            aria-label="Edit challenge"
+            @click.stop.prevent="startEdit"
+          >
+            <Pencil :size="14" />
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost btn-xs text-error"
+            :disabled="deleteMutation.isPending.value"
+            aria-label="Delete challenge"
+            @click.stop.prevent="handleDelete"
+          >
+            <Trash2 :size="14" />
+          </button>
+        </div>
       </summary>
 
       <div class="ml-4 border-l border-base-200 pl-4 py-4 space-y-4">
-        <div>
-          <div v-if="isEditing" class="space-y-2">
-            <input
-              v-model="editedPrompt"
-              type="text"
-              class="input input-sm"
-              @keyup.enter="saveEdit"
-              @keyup.escape="cancelEdit"
-            />
-            <div class="flex items-center gap-2">
-              <button
-                @click="saveEdit"
-                class="btn btn-primary btn-xs"
-                :disabled="updateMutation.isPending.value"
-                aria-label="Save"
-              >
-                <Check :size="14" />
-                Save
-              </button>
-              <button
-                @click="cancelEdit"
-                class="btn btn-outline btn-xs"
-                :disabled="updateMutation.isPending.value"
-                aria-label="Cancel"
-              >
-                <X :size="14" />
-                Cancel
-              </button>
-            </div>
-          </div>
-          <div v-else class="flex items-center justify-end gap-1">
-            <button class="btn btn-ghost btn-xs" type="button" @click.stop="startEdit">
-              <Pencil :size="14" />
-              Edit
+        <div v-if="isEditing" class="space-y-2">
+          <input
+            v-model="editedPrompt"
+            type="text"
+            class="input input-sm"
+            @keyup.enter="saveEdit"
+            @keyup.escape="cancelEdit"
+          />
+          <div class="flex items-center gap-2">
+            <button
+              @click="saveEdit"
+              class="btn btn-primary btn-xs"
+              :disabled="updateMutation.isPending.value"
+              aria-label="Save"
+            >
+              <Check :size="14" />
+              Save
             </button>
             <button
-              class="btn btn-ghost btn-xs"
-              type="button"
-              :disabled="deleteMutation.isPending.value"
-              @click.stop="handleDelete"
+              @click="cancelEdit"
+              class="btn btn-outline btn-xs"
+              :disabled="updateMutation.isPending.value"
+              aria-label="Cancel"
             >
-              <Trash2 :size="14" />
-              Delete
+              <X :size="14" />
+              Cancel
             </button>
           </div>
         </div>
 
-        <div>
-          <div class="flex items-center gap-2 mb-2">
-            <span class="text-sm font-medium">Glosses</span>
-            <button
-              type="button"
-              class="btn btn-xs btn-outline"
-              @click.stop="openCreateGlossModal"
-              :disabled="isGlossPending"
-            >
-              Add Gloss
-            </button>
-          </div>
+        <div class="space-y-2">
           <div v-if="!challenge.glosses.length" class="text-sm text-light italic">
             No glosses attached yet.
           </div>
@@ -335,20 +327,19 @@ function updateEnglishPrompt(prompts: LocalizedString[], content: string): Local
             >
               <div class="flex-1">
                 <div class="text-sm font-medium">
-                  {{ gloss.content }}
-                  <span class="text-xs uppercase text-light ml-2">{{ gloss.language }}</span>
+                  {{ formatGlossContent(gloss) }}
                 </div>
                 <div class="text-xs text-light flex flex-wrap gap-2">
-                  <span v-if="gloss.isParaphrased">Paraphrased</span>
                   <span v-if="gloss.transcriptions.length">
                     Transcriptions: {{ gloss.transcriptions.join(", ") }}
                   </span>
                   <span v-if="gloss.notes.length">Notes: {{ gloss.notes.length }}</span>
                 </div>
               </div>
+              <span class="text-xs uppercase text-light tracking-wide">{{ gloss.language }}</span>
               <div class="flex items-center gap-1">
                 <button class="btn btn-ghost btn-xs" type="button" @click.stop="openEditGlossModal(gloss)">
-                  Edit
+                  <Pencil :size="12" />
                 </button>
                 <button
                   class="btn btn-ghost btn-xs text-error"
@@ -356,11 +347,19 @@ function updateEnglishPrompt(prompts: LocalizedString[], content: string): Local
                   :disabled="isGlossPending"
                   @click.stop="handleDeleteGloss(gloss)"
                 >
-                  Delete
+                  <Trash2 :size="12" />
                 </button>
               </div>
             </div>
           </div>
+          <button
+            type="button"
+            class="btn btn-outline btn-xs w-full justify-start"
+            @click.stop="openCreateGlossModal"
+            :disabled="isGlossPending"
+          >
+            Add gloss
+          </button>
         </div>
       </div>
     </details>

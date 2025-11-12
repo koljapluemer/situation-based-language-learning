@@ -243,6 +243,11 @@ function toUnderstandingWritePayload(
     glossIds: challenge.glosses.map((gloss) => gloss.id),
   };
 }
+
+function formatGlossContent(gloss: GlossDTO): string {
+  const base = gloss.content || "—";
+  return gloss.isParaphrased ? `[${base}]` : base;
+}
 </script>
 
 <template>
@@ -251,39 +256,33 @@ function toUnderstandingWritePayload(
       <summary class="flex items-center gap-2 py-2 px-3 cursor-pointer hover:bg-base-200 list-none">
         <ChevronRight :size="16" class="group-open:hidden" />
         <ChevronDown :size="16" class="hidden group-open:block" />
-        <div class="flex flex-col">
+        <div class="flex flex-col flex-1">
           <span class="font-medium">{{ challenge.text }}</span>
           <span class="text-xs text-light">{{ getLanguageDisplay(challenge.language) }}</span>
         </div>
-        <span class="text-xs text-light ml-auto">
-          {{ challenge.glosses.length }} gloss{{ challenge.glosses.length === 1 ? "" : "es" }}
-        </span>
+        <div class="flex items-center gap-1 ml-auto">
+          <button
+            type="button"
+            class="btn btn-ghost btn-xs"
+            aria-label="Edit challenge"
+            @click.stop.prevent="startEdit"
+          >
+            <Pencil :size="14" />
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost btn-xs text-error"
+            :disabled="deleteMutation.isPending.value"
+            aria-label="Delete challenge"
+            @click.stop.prevent="handleDelete"
+          >
+            <Trash2 :size="14" />
+          </button>
+        </div>
       </summary>
 
       <div class="ml-4 border-l border-base-200 pl-4 py-4 space-y-4">
-        <div v-if="!isEditing" class="flex items-start gap-2">
-          <div class="flex-1 space-y-1">
-            <p class="text-sm font-medium">Challenge text</p>
-            <p class="text-sm">{{ challenge.text }}</p>
-          </div>
-          <div class="flex items-center gap-1">
-            <button class="btn btn-ghost btn-xs" type="button" @click.stop="startEdit">
-              <Pencil :size="14" />
-              Edit
-            </button>
-            <button
-              class="btn btn-ghost btn-xs"
-              type="button"
-              :disabled="deleteMutation.isPending.value"
-              @click.stop="handleDelete"
-            >
-              <Trash2 :size="14" />
-              Delete
-            </button>
-          </div>
-        </div>
-
-        <div v-else class="space-y-3">
+        <div v-if="isEditing" class="space-y-3">
           <input
             v-model="editedText"
             type="text"
@@ -314,18 +313,7 @@ function toUnderstandingWritePayload(
           </div>
         </div>
 
-        <div>
-          <div class="flex items-center gap-2 mb-2">
-            <span class="text-sm font-medium">Glosses</span>
-            <button
-              type="button"
-              class="btn btn-xs btn-outline"
-              @click.stop="openCreateGlossModal"
-              :disabled="isGlossPending"
-            >
-              Add Gloss
-            </button>
-          </div>
+        <div class="space-y-2">
           <div v-if="!challenge.glosses.length" class="text-sm text-light italic">
             No glosses attached yet.
           </div>
@@ -337,20 +325,19 @@ function toUnderstandingWritePayload(
             >
               <div class="flex-1">
                 <div class="text-sm font-medium">
-                  {{ gloss.content }}
-                  <span class="text-xs uppercase text-light ml-2">{{ gloss.language }}</span>
+                  {{ formatGlossContent(gloss) }}
                 </div>
                 <div class="text-xs text-light flex flex-wrap gap-2">
-                  <span v-if="gloss.isParaphrased">Paraphrased</span>
                   <span v-if="gloss.transcriptions.length">
                     Transcriptions: {{ gloss.transcriptions.join(", ") }}
                   </span>
                   <span v-if="gloss.notes.length">Notes: {{ gloss.notes.length }}</span>
                 </div>
               </div>
+              <span class="text-xs uppercase text-light tracking-wide">{{ gloss.language }}</span>
               <div class="flex items-center gap-1">
                 <button class="btn btn-ghost btn-xs" type="button" @click.stop="openEditGlossModal(gloss)">
-                  Edit
+                  <Pencil :size="12" />
                 </button>
                 <button
                   class="btn btn-ghost btn-xs text-error"
@@ -358,11 +345,19 @@ function toUnderstandingWritePayload(
                   :disabled="isGlossPending"
                   @click.stop="handleDeleteGloss(gloss)"
                 >
-                  Delete
+                  <Trash2 :size="12" />
                 </button>
               </div>
             </div>
           </div>
+          <button
+            type="button"
+            class="btn btn-outline btn-xs justify-start"
+            @click.stop="openCreateGlossModal"
+            :disabled="isGlossPending"
+          >
+            Add gloss
+          </button>
         </div>
       </div>
     </details>

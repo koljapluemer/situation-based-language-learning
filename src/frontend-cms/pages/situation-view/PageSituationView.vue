@@ -115,16 +115,9 @@ async function handleChallengeUpdated() {
               <ChevronRight :size="20" v-if="!expressionSectionOpen" />
               <ChevronDown :size="20" v-else />
               <h3 class="text-lg font-bold">Challenges of Expression</h3>
-              <button
-                @click.stop="openExpressionModal"
-                class="btn btn-primary btn-sm ml-auto"
-                type="button"
-              >
-                Add Expression Challenge
-              </button>
             </summary>
 
-            <div class="mt-4">
+            <div class="mt-4 space-y-3">
               <div v-if="situation.challengesOfExpression.length === 0" class="text-center py-4 text-base-content/70">
                 No expression challenges yet
               </div>
@@ -139,6 +132,15 @@ async function handleChallengeUpdated() {
                   @updated="handleChallengeUpdated"
                 />
               </div>
+              <div>
+                <button
+                  @click="openExpressionModal"
+                  class="btn btn-outline btn-sm justify-start"
+                  type="button"
+                >
+                  Add expression challenge
+                </button>
+              </div>
             </div>
           </details>
         </div>
@@ -152,16 +154,9 @@ async function handleChallengeUpdated() {
               <ChevronRight :size="20" v-if="!understandingSectionOpen" />
               <ChevronDown :size="20" v-else />
               <h3 class="text-lg font-bold">Challenges of Understanding Text</h3>
-              <button
-                @click.stop="openUnderstandingModal"
-                class="btn btn-primary btn-sm ml-auto"
-                type="button"
-              >
-                Add Understanding Challenge
-              </button>
             </summary>
 
-            <div class="mt-4">
+            <div class="mt-4 space-y-3">
               <div v-if="situation.challengesOfUnderstandingText.length === 0" class="text-center py-4 text-base-content/70">
                 No understanding challenges yet
               </div>
@@ -175,6 +170,15 @@ async function handleChallengeUpdated() {
                   @deleted="handleChallengeDeleted"
                   @updated="handleChallengeUpdated"
                 />
+              </div>
+              <div>
+                <button
+                  @click="openUnderstandingModal"
+                  class="btn btn-outline btn-sm justify-start"
+                  type="button"
+                >
+                  Add understanding challenge
+                </button>
               </div>
             </div>
           </details>

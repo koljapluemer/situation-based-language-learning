@@ -169,14 +169,18 @@ async function handleSubmit() {
 
           <fieldset class="fieldset">
             <label for="gloss-content" class="label">Content</label>
-            <input
-              id="gloss-content"
-              v-model="form.content"
-              type="text"
-              class="input"
-              placeholder="Hola"
-              required
-            />
+            <div class="flex items-center gap-2">
+              <span v-if="form.isParaphrased" aria-hidden="true" class="text-lg text-light">[</span>
+              <input
+                id="gloss-content"
+                v-model="form.content"
+                type="text"
+                class="input flex-1"
+                placeholder="Hola"
+                required
+              />
+              <span v-if="form.isParaphrased" aria-hidden="true" class="text-lg text-light">]</span>
+            </div>
           </fieldset>
 
           <label class="flex items-center gap-2 text-sm">
