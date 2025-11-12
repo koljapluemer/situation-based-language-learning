@@ -25,18 +25,24 @@ All endpoints are versionless for now; introduce `/v1` when the contract stabili
 Every payload reuses the shared TypeScript DTOs:
 
 ```ts
+type GlossReference = {
+  id: string;
+  language: LanguageCode;
+  content: string;
+};
+
 interface GlossDTO {
   id: string;
   content: string;
   isParaphrased: boolean;
   transcriptions: string[];
   notes: Note[];
-  contains: GlossIdentifier[];
-  nearSynonyms: GlossIdentifier[];
-  nearHomophones: GlossIdentifier[];
-  translations: GlossIdentifier[];
-  clarifiesUsage: GlossIdentifier[];
-  toBeDifferentiatedFrom: GlossIdentifier[];
+  contains: GlossReference[];
+  nearSynonyms: GlossReference[];
+  nearHomophones: GlossReference[];
+  translations: GlossReference[];
+  clarifiesUsage: GlossReference[];
+  toBeDifferentiatedFrom: GlossReference[];
 }
 
 interface SituationDTO {
@@ -49,7 +55,7 @@ interface SituationDTO {
 
 Resolution rules:
 
-- Relation arrays now return lightweight `GlossIdentifier` entries (`{ language, content }`) to avoid recursive loops.
+- Relation arrays now return lightweight `GlossReference` entries (`{ id, language, content }`) to avoid recursive loops.
 
 ---
 

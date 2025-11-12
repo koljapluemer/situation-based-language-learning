@@ -1,5 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import { GlossDTO, GlossIdentifier, LanguageCode, Note } from "@sbl/shared";
+import { GlossDTO, GlossReference, LanguageCode, Note } from "@sbl/shared";
 import { prisma as defaultClient } from "../lib/prisma";
 
 const relationSelect = { select: { id: true, language: true, content: true } } as const;
@@ -63,11 +63,12 @@ export class GlossResolver {
     };
   }
 
-  private mapIdentifiers(glosses?: { language: string; content: string }[]): GlossIdentifier[] {
+  private mapIdentifiers(glosses?: { id: string; language: string; content: string }[]): GlossReference[] {
     if (!glosses?.length) {
       return [];
     }
     return glosses.map((gloss) => ({
+      id: gloss.id,
       language: gloss.language as LanguageCode,
       content: gloss.content,
     }));

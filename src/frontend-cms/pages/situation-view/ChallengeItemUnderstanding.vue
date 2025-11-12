@@ -13,6 +13,7 @@ import { LANGUAGES } from "@sbl/shared";
 import { useToast } from "../../dumb/toasts/index";
 import LanguageSelect from "../../dumb/LanguageSelect.vue";
 import GlossModal from "../../features/gloss-manage/GlossModal.vue";
+import GlossTreeNode from "../../features/gloss-tree/GlossTreeNode.vue";
 
 const props = defineProps<{
   challenge: ChallengeOfUnderstandingText;
@@ -193,28 +194,6 @@ async function attachGloss(glossId: string) {
   await persistUnderstandingChallenges(updatedChallenges);
 }
 
-async function handleDeleteGloss(gloss: GlossDTO) {
-  if (!confirm("Delete this gloss for all challenges? This action cannot be undone.")) {
-    return;
-  }
-
-  try {
-    isGlossPending.value = true;
-    const response = await fetch(`${API_BASE_URL}/glosses/${gloss.id}`, {
-      method: "DELETE",
-    });
-    if (!response.ok) {
-      throw new Error(`Failed to delete gloss: ${response.status}`);
-    }
-    toast.success("Gloss deleted");
-    emit("updated");
-  } catch (error) {
-    toast.error(error instanceof Error ? error.message : "Failed to delete gloss");
-  } finally {
-    isGlossPending.value = false;
-  }
-}
-
 async function persistUnderstandingChallenges(challenges: ChallengeOfUnderstandingTextWriteInput[]) {
   const response = await fetch(`${API_BASE_URL}/situations/${props.situationId}?language=eng`, {
     method: "PATCH",
@@ -244,10 +223,6 @@ function toUnderstandingWritePayload(
   };
 }
 
-function formatGlossContent(gloss: GlossDTO): string {
-  const base = gloss.content || "—";
-  return gloss.isParaphrased ? `[${base}]` : base;
-}
 </script>
 
 <template>
@@ -317,38 +292,13 @@ function formatGlossContent(gloss: GlossDTO): string {
           <div v-if="!challenge.glosses.length" class="text-sm text-light italic">
             No glosses attached yet.
           </div>
-          <div v-else class="space-y-1">
-            <div
+          <div v-else class="space-y-2">
+            <GlossTreeNode
               v-for="gloss in challenge.glosses"
               :key="gloss.id"
-              class="flex items-start gap-2 py-1 px-2 rounded hover:bg-base-200"
-            >
-              <div class="flex-1">
-                <div class="text-sm font-medium">
-                  {{ formatGlossContent(gloss) }}
-                </div>
-                <div class="text-xs text-light flex flex-wrap gap-2">
-                  <span v-if="gloss.transcriptions.length">
-                    Transcriptions: {{ gloss.transcriptions.join(", ") }}
-                  </span>
-                  <span v-if="gloss.notes.length">Notes: {{ gloss.notes.length }}</span>
-                </div>
-              </div>
-              <span class="text-xs uppercase text-light tracking-wide">{{ gloss.language }}</span>
-              <div class="flex items-center gap-1">
-                <button class="btn btn-ghost btn-xs" type="button" @click.stop="openEditGlossModal(gloss)">
-                  <Pencil :size="12" />
-                </button>
-                <button
-                  class="btn btn-ghost btn-xs text-error"
-                  type="button"
-                  :disabled="isGlossPending"
-                  @click.stop="handleDeleteGloss(gloss)"
-                >
-                  <Trash2 :size="12" />
-                </button>
-              </div>
-            </div>
+              :gloss="gloss"
+              @changed="emit('updated')"
+            />
           </div>
           <button
             type="button"
@@ -365,8 +315,7 @@ function formatGlossContent(gloss: GlossDTO): string {
 
   <GlossModal
     :show="showGlossModal"
-    :mode="glossModalMode"
-    :initial-gloss="activeGloss ?? undefined"
+    mode="create"
     :defaults="{ language: editedLanguage }"
     @close="closeGlossModal"
     @saved="handleGlossSaved"
