@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import type { SituationDTO } from "@sbl/shared";
+import { Eye } from "lucide-vue-next";
 import ModalCreateSituation from "../../features/situation-create/ModalCreateSituation.vue";
 import { useModalCreateSituation } from "../../features/situation-create/index";
 import { useToast } from "../../dumb/toasts/index";
@@ -107,11 +108,12 @@ onMounted(loadSituations);
             <th>#</th>
             <th>Identifier</th>
             <th>Descriptions</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="!situations.length">
-            <td colspan="3" class="py-8 text-center text-base-content/70">
+            <td colspan="4" class="py-8 text-center text-base-content/70">
               No situations found.
             </td>
           </tr>
@@ -127,6 +129,15 @@ onMounted(loadSituations);
                   {{ desc.content }}
                 </li>
               </ul>
+            </td>
+            <td>
+              <router-link
+                :to="{ name: 'situation-view', params: { id: situation.identifier } }"
+                class="btn btn-ghost btn-sm"
+                aria-label="View situation"
+              >
+                <Eye :size="16" />
+              </router-link>
             </td>
           </tr>
         </tbody>

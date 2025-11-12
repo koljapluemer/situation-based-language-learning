@@ -69,7 +69,7 @@ export class SituationService {
         if (payload.descriptions) data.descriptions = payload.descriptions as Prisma.JsonArray;
 
         if (Object.keys(data).length) {
-          await tx.situation.update({ where: { id }, data });
+          await tx.situation.update({ where: { identifier: id }, data });
         }
 
         if (payload.challengesOfExpression) {
@@ -117,12 +117,12 @@ export class SituationService {
 
   async delete(id: string): Promise<void> {
     await this.ensureExists(id);
-    await this.client.situation.delete({ where: { id } });
+    await this.client.situation.delete({ where: { identifier: id } });
   }
 
   async findById(id: string, query: SituationQueryInput): Promise<SituationDTO> {
     const situation = await this.client.situation.findUnique({
-      where: { id },
+      where: { identifier: id },
       include: situationInclude,
     });
 
@@ -263,7 +263,7 @@ export class SituationService {
   }
 
   private async ensureExists(id: string) {
-    const exists = await this.client.situation.findUnique({ where: { id }, select: { id: true } });
+    const exists = await this.client.situation.findUnique({ where: { identifier: id }, select: { identifier: true } });
     if (!exists) {
       throw new NotFoundError(`Situation ${id} not found`);
     }

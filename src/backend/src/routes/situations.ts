@@ -3,7 +3,7 @@ import { z } from "zod";
 import { SituationService } from "../services/situation-service";
 import { situationQuerySchema, situationUpdateSchema, situationWriteSchema } from "../schemas/situation-schema";
 
-const paramsSchema = z.object({ id: z.string().cuid() });
+const paramsSchema = z.object({ id: z.string().min(1) }); // identifier (e.g., "greeting-basic")
 const service = new SituationService();
 
 export function registerSituationRoutes(app: FastifyInstance) {

@@ -98,10 +98,3 @@ Shared DTO Library:
 
 - `src/shared/index.ts` re-exports the DTOs/types so every workspace consumes the same contract.
 - Interfaces remain the single source of truth for REST payloads; backend services already import them directly, and the Vue apps can point at the same definitions.
-
-## Next Steps
-
-1. Re-run `npm install` at the root to regenerate a workspace-aware `package-lock.json`.
-2. Flesh out the Vue apps (pages, components, env configs) now that their scaffolding is in place.
-3. Consider adding automated tests per workspace (e.g., Vitest for frontends, Jest/Tap for backend).
-4. Extend CI/CD to call the workspace scripts (`npm run backend:build`, `npm run cms:build`, etc.) before deployments.

@@ -7,20 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum LanguageCode {
-  deu
-  arz
-  arb
-  apc
-  cmn
-  fra
-  spa
-  uzb
-}
+// Note: Language codes are validated at the application layer using @sbl/shared/Language.ts
+// This allows a single source of truth for language definitions
 
 model Situation {
-  id        String   @id @default(cuid())
-  identifier String  @unique
+  identifier String  @id  // Human-readable identifier serves as primary key (e.g., "greeting-basic")
   descriptions Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -31,7 +22,7 @@ model Situation {
 
 model Gloss {
   id             String   @id @default(cuid())
-  language       LanguageCode
+  language       String   // Validated against LANGUAGES in @sbl/shared
   content        String
   isParaphrased  Boolean  @default(false)
   transcriptions String[] @default([])
@@ -64,18 +55,18 @@ model ChallengeOfExpression {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  situation Situation @relation(fields: [situationId], references: [id], onDelete: Cascade)
+  situation Situation @relation(fields: [situationId], references: [identifier], onDelete: Cascade)
   glosses   Gloss[]   @relation("ExpressionGlosses")
 }
 
 model ChallengeOfUnderstandingText {
   id          String   @id @default(cuid())
   text        String
-  language    LanguageCode
+  language    String   // Validated against LANGUAGES in @sbl/shared
   situationId String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  situation Situation @relation(fields: [situationId], references: [id], onDelete: Cascade)
+  situation Situation @relation(fields: [situationId], references: [identifier], onDelete: Cascade)
   glosses   Gloss[]   @relation("UnderstandingGlosses")
 }

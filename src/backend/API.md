@@ -170,6 +170,8 @@ Response: `{ "data": [SituationDTO, ...] }`.
 GET /situations/:id
 ```
 
+Where `:id` is the situation identifier (e.g., `greeting-basic`), not a cuid.
+
 Response is `{ "data": SituationDTO }`.
 
 ### Create
@@ -214,6 +216,8 @@ Notes:
 PATCH /situations/:id?language=spa
 ```
 
+Where `:id` is the situation identifier (e.g., `greeting-basic`).
+
 - Request body uses `situationUpdateSchema`.
 - Providing `challengesOfExpression` or `challengesOfUnderstandingText` replaces all existing challenges of that type (internally a delete + recreate).
 - The `language` query parameter controls the response DTO.
@@ -223,6 +227,8 @@ PATCH /situations/:id?language=spa
 ```
 DELETE /situations/:id
 ```
+
+Where `:id` is the situation identifier (e.g., `greeting-basic`).
 
 Also deletes associated challenges (cascade).
 
