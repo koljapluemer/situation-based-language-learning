@@ -26,6 +26,7 @@ export const challengeOfUnderstandingTextWriteSchema = z.object({
 export const situationWriteSchema = z.object({
   identifier: z.string().min(1),
   descriptions: z.array(localizedStringSchema).min(1),
+  imageLink: z.string().url().optional(),
   challengesOfExpression: z.array(challengeOfExpressionWriteSchema).default([]),
   challengesOfUnderstandingText: z
     .array(challengeOfUnderstandingTextWriteSchema)
@@ -35,6 +36,7 @@ export const situationWriteSchema = z.object({
 export const situationUpdateSchema = z.object({
   identifier: z.string().min(1).optional(),
   descriptions: z.array(localizedStringSchema).min(1).optional(),
+  imageLink: z.string().url().optional(),
   challengesOfExpression: z.array(challengeOfExpressionWriteSchema).optional(),
   challengesOfUnderstandingText: z.array(challengeOfUnderstandingTextWriteSchema).optional(),
 });

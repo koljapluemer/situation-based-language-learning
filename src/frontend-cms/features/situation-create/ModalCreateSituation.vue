@@ -5,10 +5,11 @@ import { useModalCreateSituation } from "./index";
 const { isOpen, close } = useModalCreateSituation();
 
 const emit = defineEmits<{
-  create: [description: string];
+  create: [description: string, imageLink?: string];
 }>();
 
 const description = ref("");
+const imageLink = ref("");
 const isSubmitting = ref(false);
 
 function handleSubmit() {
@@ -16,12 +17,14 @@ function handleSubmit() {
   if (!trimmed) return;
 
   isSubmitting.value = true;
-  emit("create", trimmed);
+  const imageLinkValue = imageLink.value.trim() || undefined;
+  emit("create", trimmed, imageLinkValue);
 }
 
 function handleClose() {
   if (isSubmitting.value) return;
   description.value = "";
+  imageLink.value = "";
   close();
 }
 
@@ -29,6 +32,7 @@ function handleClose() {
 function handleModalClose() {
   if (!isOpen.value) {
     description.value = "";
+    imageLink.value = "";
     isSubmitting.value = false;
   }
 }
@@ -50,6 +54,18 @@ function handleModalClose() {
               class="input"
               placeholder="Greeting someone at a café"
               required
+              :disabled="isSubmitting"
+            />
+          </fieldset>
+
+          <fieldset class="fieldset">
+            <label for="image-link" class="label">Image URL (optional)</label>
+            <input
+              id="image-link"
+              v-model="imageLink"
+              type="url"
+              class="input"
+              placeholder="https://example.com/images/greeting.jpg"
               :disabled="isSubmitting"
             />
           </fieldset>

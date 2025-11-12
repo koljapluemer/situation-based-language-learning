@@ -42,6 +42,7 @@ export class SituationService {
         data: {
           identifier: payload.identifier,
           descriptions: payload.descriptions,
+          imageLink: payload.imageLink,
           challengesOfExpression: this.buildExpressionChallengeCreate(payload),
           challengesOfUnderstanding: this.buildUnderstandingChallengeCreate(payload),
         },
@@ -67,6 +68,7 @@ export class SituationService {
         const data: Prisma.SituationUpdateInput = {};
         if (payload.identifier) data.identifier = payload.identifier;
         if (payload.descriptions) data.descriptions = payload.descriptions as Prisma.JsonArray;
+        if (payload.imageLink !== undefined) data.imageLink = payload.imageLink;
 
         if (Object.keys(data).length) {
           await tx.situation.update({ where: { identifier: id }, data });
@@ -200,6 +202,7 @@ export class SituationService {
     return {
       identifier: situation.identifier,
       descriptions,
+      imageLink: situation.imageLink ?? undefined,
       challengesOfExpression: situation.challengesOfExpression.map((challenge) =>
         this.mapExpressionChallenge(challenge, glossMap)
       ),

@@ -48,6 +48,7 @@ interface GlossDTO {
 interface SituationDTO {
   identifier: string;
   descriptions: LocalizedString[];
+  imageLink?: string;
   challengesOfExpression: ChallengeOfExpression[];
   challengesOfUnderstandingText: ChallengeOfUnderstandingText[];
 }
@@ -212,6 +213,7 @@ Body schema (`situationWriteSchema`):
     { "language": "spa", "content": "Primeros saludos" },
     { "language": "deu", "content": "Erste Grüße" }
   ],
+  "imageLink": "https://example.com/images/greeting.jpg",
   "challengesOfExpression": [
     {
       "identifier": "saluda-a-un-amigo",
@@ -234,6 +236,7 @@ Body schema (`situationWriteSchema`):
 
 Notes:
 
+- `imageLink` is optional and must be a valid URL if provided.
 - `language` in the payload is used only to shape the response.
 - Expression challenges must include at least one English prompt; additional languages are optional.
 - Challenge arrays default to `[]`; omit them to create empty situations.
