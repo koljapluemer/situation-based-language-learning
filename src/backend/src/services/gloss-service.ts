@@ -1,6 +1,9 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { GlossDTO, LanguageCode } from "@sbl/shared";
-import { GlossWriteInput, GlossUpdateInput } from "../schemas/gloss-schema";
+import {
+  GlossWriteInput,
+  GlossUpdateInput,
+} from "../schemas/gloss-schema";
 import { prisma as defaultClient } from "../lib/prisma";
 import { GlossResolver } from "./gloss-resolver";
 import { ConflictError, NotFoundError } from "../utils/http-error";
@@ -105,6 +108,66 @@ export class GlossService {
     return glosses
       .map((gloss) => map.get(gloss.id))
       .filter((item): item is GlossDTO => Boolean(item));
+  }
+
+  async search(language: LanguageCode, query: string, limit = 5): Promise<GlossDTO[]> {
+    const glosses = await this.client.gloss.findMany({
+      where: {
+        language,
+        content: {
+          contains: query,
+          mode: "insensitive",
+        },
+      },
+      select: { id: true },
+      orderBy: { updatedAt: "desc" },
+      take: limit,
+    });
+
+    const map = await this.resolver.resolveByIds(glosses.map((g) => g.id));
+    return glosses
+      .map((gloss) => map.get(gloss.id))
+      .filter((item): item is GlossDTO => Boolean(item));
+  }
+
+  async referenceSummary(id: string) {
+    const summary = await this.client.gloss.findUnique({
+      where: { id },
+      select: {
+        _count: {
+          select: {
+            expressionChallenges: true,
+            understandingChallenges: true,
+            containedBy: true,
+            synonymousWith: true,
+            homophoneOf: true,
+            translatedBy: true,
+            clarifiedBy: true,
+            differentiationOf: true,
+          },
+        },
+      },
+    });
+
+    if (!summary) {
+      throw new NotFoundError(`Gloss ${id} not found`);
+    }
+
+    const counts = summary._count;
+    const totalReferences =
+      counts.expressionChallenges +
+      counts.understandingChallenges +
+      counts.containedBy +
+      counts.synonymousWith +
+      counts.homophoneOf +
+      counts.translatedBy +
+      counts.clarifiedBy +
+      counts.differentiationOf;
+
+    return {
+      totalReferences,
+      breakdown: counts,
+    };
   }
 
   private connectRelations(ids?: string[]) {

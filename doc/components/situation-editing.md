@@ -10,6 +10,17 @@
 - The CMS never deletes a gloss while editing a situation unless the user explicitly asks to remove it from a challenge. Actual gloss deletion happens through the tree node’s delete button, which calls `/glosses/:id` and relies on cascading detachments.
 - “Contains” expands recursively because curriculum designers rely on nested scaffolding (e.g., “conversation” contains “greeting” contains “hola”). Translations are limited to depth 1 so we don’t reintroduce cross-language recursion that UX cannot visualize cleanly.
 
+### Gloss Deduplication Flow
+- Prisma enforces `@@unique([language, content])` on `Gloss`. The modal mirrors that rule: as the user types, we hit `/glosses?language=X&content=Y` (exact) plus `/glosses/search` (fuzzy) with a debounce so we don’t hammer the DB.
+- When an exact match already exists, we hide the metadata fields, change the primary CTA to “Attach existing gloss”, and emit the existing DTO so the caller simply connects the ID.
+- Fuzzy matches show up as inline buttons under the content field. Clicking one immediately attaches the gloss and closes the modal. This keeps authors from re‑creating “hola” for every situation.
+
+### Detach vs Delete Semantics
+- Every tree row now has two separate controls:
+  - Detach (chain/X icon) only removes the relation (from a challenge, `contains`, or `translations`). The resource itself stays in the catalog.
+  - Delete (trash) first fetches `/glosses/:id/references`. If other contexts still rely on the gloss we show “Really delete… N references refer to this?” so the user understands the blast radius before issuing `DELETE /glosses/:id`.
+- Top-level challenge rows pass `detachable` into `GlossTreeNode`, so removing a gloss from a challenge always happens via a regular PATCH on the situation—not by deleting the gloss outright.
+
 ### UI Structure
 - `PageSituationView` owns the canonical TanStack Query cache for a single situation. Modals mutate by cloning the cached DTO, replacing arrays, and PATCHing; on success we invalidate the query to force a refetch. No optimistic writes because gloss resolution can change underlying data.
 - Each challenge row (`ChallengeItemExpression` / `ChallengeItemUnderstanding`) is a `details` tree. Summaries show a single line (polite file-tree aesthetic) with inline icon controls, keeping the vertical rhythm predictable.

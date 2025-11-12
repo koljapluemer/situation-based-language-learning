@@ -90,6 +90,14 @@ Response:
 }
 ```
 
+### Search (fuzzy)
+
+```
+GET /glosses/search?language=spa&query=hol&limit=5
+```
+
+Helps find existing glosses while the CMS user is typing. Returns a short list of partial matches in the specified language, ordered by recent updates.
+
 ### Retrieve
 
 ```
@@ -140,7 +148,13 @@ Partial payload (`glossUpdateSchema`). Omitting a relation array leaves it uncha
 DELETE /glosses/:id
 ```
 
-No response body (`204`).
+No response body (`204`). Use the companion endpoint below to surface warnings:
+
+```
+GET /glosses/:id/references
+```
+
+Returns `{ "totalReferences": number, "breakdown": { ... } }`, counting every challenge/gloss that still points at the target gloss.
 
 ### Validation Errors
 
@@ -223,6 +237,7 @@ Notes:
 - `language` in the payload is used only to shape the response.
 - Expression challenges must include at least one English prompt; additional languages are optional.
 - Challenge arrays default to `[]`; omit them to create empty situations.
+- Glosses are unique per `(language, content)`. When a matching entry already exists, attach its `id` instead of creating a duplicate (`/glosses/search` helps surface candidates).
 
 ### Update
 

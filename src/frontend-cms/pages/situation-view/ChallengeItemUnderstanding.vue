@@ -35,8 +35,6 @@ const isEditing = ref(false);
 const editedText = ref(props.challenge.text);
 const editedLanguage = ref<LanguageCode>(props.challenge.language);
 const showGlossModal = ref(false);
-const glossModalMode = ref<"create" | "edit">("create");
-const activeGloss = ref<GlossDTO | null>(null);
 const isGlossPending = ref(false);
 
 watch(
@@ -139,38 +137,24 @@ function saveEdit() {
 }
 
 function openCreateGlossModal() {
-  activeGloss.value = null;
-  glossModalMode.value = "create";
-  showGlossModal.value = true;
-}
-
-function openEditGlossModal(gloss: GlossDTO) {
-  activeGloss.value = gloss;
-  glossModalMode.value = "edit";
   showGlossModal.value = true;
 }
 
 function closeGlossModal() {
   showGlossModal.value = false;
-  activeGloss.value = null;
 }
 
-async function handleGlossSaved(gloss: GlossDTO) {
+async function handleGlossSaved(gloss: GlossDTO, meta?: { existed: boolean }) {
   showGlossModal.value = false;
   try {
-    isGlossPending.value = glossModalMode.value === "create";
-    if (glossModalMode.value === "create") {
-      await attachGloss(gloss.id);
-      toast.success("Gloss added to challenge");
-    } else {
-      toast.success("Gloss updated");
-    }
+    isGlossPending.value = true;
+    await attachGloss(gloss.id);
+    toast.success(meta?.existed ? "Attached existing gloss" : "Gloss added to challenge");
     emit("updated");
   } catch (error) {
     toast.error(error instanceof Error ? error.message : "Failed to save gloss");
   } finally {
     isGlossPending.value = false;
-    activeGloss.value = null;
   }
 }
 
@@ -192,6 +176,36 @@ async function attachGloss(glossId: string) {
   });
 
   await persistUnderstandingChallenges(updatedChallenges);
+}
+
+async function detachGloss(glossId: string) {
+  const situation = queryClient.getQueryData<SituationDTO>(["situation", props.situationId]);
+  if (!situation) throw new Error("Situation not found in cache");
+
+  isGlossPending.value = true;
+  try {
+    const updatedChallenges = situation.challengesOfUnderstandingText.map((challenge, i) => {
+      if (i === props.index) {
+        const remainingIds = challenge.glosses
+          .filter((gloss) => gloss.id !== glossId)
+          .map((gloss) => gloss.id);
+        return {
+          text: challenge.text,
+          language: challenge.language,
+          glossIds: remainingIds,
+        } satisfies ChallengeOfUnderstandingTextWriteInput;
+      }
+      return toUnderstandingWritePayload(challenge);
+    });
+
+    await persistUnderstandingChallenges(updatedChallenges);
+    toast.success("Gloss detached");
+    emit("updated");
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : "Failed to detach gloss");
+  } finally {
+    isGlossPending.value = false;
+  }
 }
 
 async function persistUnderstandingChallenges(challenges: ChallengeOfUnderstandingTextWriteInput[]) {
@@ -297,6 +311,8 @@ function toUnderstandingWritePayload(
               v-for="gloss in challenge.glosses"
               :key="gloss.id"
               :gloss="gloss"
+              detachable
+              @detach="detachGloss(gloss.id)"
               @changed="emit('updated')"
             />
           </div>

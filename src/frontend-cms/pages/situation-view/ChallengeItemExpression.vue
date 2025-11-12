@@ -133,15 +133,45 @@ function closeGlossModal() {
   showGlossModal.value = false;
 }
 
-async function handleGlossSaved(gloss: GlossDTO) {
+async function handleGlossSaved(gloss: GlossDTO, meta?: { existed: boolean }) {
   showGlossModal.value = false;
   try {
     isGlossPending.value = true;
     await attachGloss(gloss.id);
-    toast.success("Gloss added to challenge");
+    toast.success(meta?.existed ? "Attached existing gloss" : "Gloss added to challenge");
     emit("updated");
   } catch (error) {
     toast.error(error instanceof Error ? error.message : "Failed to save gloss");
+  } finally {
+    isGlossPending.value = false;
+  }
+}
+
+async function detachGloss(glossId: string) {
+  const situation = queryClient.getQueryData<SituationDTO>(["situation", props.situationId]);
+  if (!situation) throw new Error("Situation not found in cache");
+
+  isGlossPending.value = true;
+  try {
+    const updatedChallenges = situation.challengesOfExpression.map((challenge, i) => {
+      if (i === props.index) {
+        const remainingIds = challenge.glosses
+          .filter((gloss) => gloss.id !== glossId)
+          .map((gloss) => gloss.id);
+        return {
+          identifier: challenge.identifier,
+          prompts: clonePrompts(challenge.prompts),
+          glossIds: remainingIds,
+        } satisfies ChallengeOfExpressionWriteInput;
+      }
+      return toChallengeWritePayload(challenge);
+    });
+
+    await persistExpressionChallenges(updatedChallenges);
+    toast.success("Gloss detached");
+    emit("updated");
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : "Failed to detach gloss");
   } finally {
     isGlossPending.value = false;
   }
@@ -283,6 +313,8 @@ function updateEnglishPrompt(prompts: LocalizedString[], content: string): Local
               v-for="gloss in challenge.glosses"
               :key="gloss.id"
               :gloss="gloss"
+              detachable
+              @detach="detachGloss(gloss.id)"
               @changed="emit('updated')"
             />
           </div>

@@ -1,7 +1,12 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { GlossService } from "../services/gloss-service";
-import { glossQuerySchema, glossUpdateSchema, glossWriteSchema } from "../schemas/gloss-schema";
+import {
+  glossQuerySchema,
+  glossSuggestSchema,
+  glossUpdateSchema,
+  glossWriteSchema,
+} from "../schemas/gloss-schema";
 
 const paramsSchema = z.object({ id: z.string().cuid() });
 const service = new GlossService();
@@ -13,9 +18,20 @@ export function registerGlossRoutes(app: FastifyInstance) {
     return { data: glosses };
   });
 
+  app.get("/glosses/search", async (request) => {
+    const { language, query, limit } = glossSuggestSchema.parse(request.query);
+    const glosses = await service.search(language, query, limit);
+    return { data: glosses };
+  });
+
   app.get("/glosses/:id", async (request) => {
     const { id } = paramsSchema.parse(request.params);
     return { data: await service.findById(id) };
+  });
+
+  app.get("/glosses/:id/references", async (request) => {
+    const { id } = paramsSchema.parse(request.params);
+    return { data: await service.referenceSummary(id) };
   });
 
   app.post("/glosses", async (request, reply) => {

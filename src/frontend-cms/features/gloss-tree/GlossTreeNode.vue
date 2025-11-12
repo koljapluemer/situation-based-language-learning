@@ -93,8 +93,13 @@ function openEditSelf() {
 
 async function handleDeleteSelf() {
   if (!localGloss.value) return;
-  if (!confirm("Delete this gloss? This cannot be undone.")) return;
   try {
+    const summary = await fetchReferenceSummary(localGloss.value.id);
+    const message = summary.totalReferences
+      ? `Delete this gloss? ${summary.totalReferences} other references rely on it.`
+      : "Delete this gloss? This cannot be undone.";
+    if (!confirm(message)) return;
+
     const response = await fetch(`${API_BASE_URL}/glosses/${localGloss.value.id}`, {
       method: "DELETE",
     });
@@ -137,7 +142,7 @@ async function detachRelation(type: RelationType, reference: GlossReference) {
   try {
     const ids = getRelationIds(type).filter((id) => id !== reference.id);
     await updateRelations(type, ids);
-    toast.success("Relation updated");
+    toast.success(type === "contains" ? "Contains list updated" : "Translation removed");
     await refreshSelf();
     emit("changed");
   } catch (error) {
@@ -250,6 +255,15 @@ function handleModalClose() {
   showModal.value = false;
   relationContext.value = null;
   modalInitial.value = null;
+}
+
+async function fetchReferenceSummary(glossId: string) {
+  const response = await fetch(`${API_BASE_URL}/glosses/${glossId}/references`);
+  if (!response.ok) {
+    throw new Error(`Failed to load references: ${response.status}`);
+  }
+  const data = await response.json();
+  return data.data as { totalReferences: number };
 }
 </script>
 
