@@ -1,4 +1,9 @@
-export const LANGUAGES = {
+export interface Language {
+  name: string;
+  emoji?: string;
+}
+
+export const LANGUAGES: Record<string, Language> = {
   deu: { name: "German", emoji: "🇩🇪" },
   arz: { name: "Egyptian Arabic", emoji: "🇪🇬" },
   arb: { name: "Standard Arabic" },
@@ -8,6 +13,6 @@ export const LANGUAGES = {
   spa: { name: "Spanish", emoji: "🇪🇸" },
   uzb: { name: "Uzbek", emoji: "🇺🇿" },
   eng: { name: "English"}
-} as const;
+};
 
 export type LanguageCode = keyof typeof LANGUAGES;
