@@ -25,6 +25,8 @@ export class GlossService {
           nearSynonyms: this.connectRelations(payload.nearSynonymIds),
           nearHomophones: this.connectRelations(payload.nearHomophoneIds),
           translations: this.connectRelations(payload.translationIds),
+          clarifiesUsage: this.connectRelations(payload.clarifiesUsageIds),
+          toBeDifferentiatedFrom: this.connectRelations(payload.toBeDifferentiatedFromIds),
         },
       });
 
@@ -56,6 +58,12 @@ export class GlossService {
     }
     if (payload.translationIds !== undefined) {
       data.translations = this.setRelations(payload.translationIds);
+    }
+    if (payload.clarifiesUsageIds !== undefined) {
+      data.clarifiesUsage = this.setRelations(payload.clarifiesUsageIds);
+    }
+    if (payload.toBeDifferentiatedFromIds !== undefined) {
+      data.toBeDifferentiatedFrom = this.setRelations(payload.toBeDifferentiatedFromIds);
     }
 
     try {

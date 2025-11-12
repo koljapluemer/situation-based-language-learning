@@ -31,10 +31,12 @@ interface GlossDTO {
   isParaphrased: boolean;
   transcriptions: string[];
   notes: Note[];
-  contains: GlossDTO[];           // recursive
-  nearSynonyms: GlossDTO[];       // depth 1
-  nearHomophones: GlossDTO[];     // depth 1
-  translations: GlossDTO[];       // depth 1
+  contains: GlossIdentifier[];
+  nearSynonyms: GlossIdentifier[];
+  nearHomophones: GlossIdentifier[];
+  translations: GlossIdentifier[];
+  clarifiesUsage: GlossIdentifier[];
+  toBeDifferentiatedFrom: GlossIdentifier[];
 }
 
 interface SituationDTO {
@@ -47,8 +49,7 @@ interface SituationDTO {
 
 Resolution rules:
 
-- `contains` is resolved recursively to arbitrary depth.
-- `nearSynonyms`, `nearHomophones`, `translations` are resolved exactly one level deep (their own relation arrays will be empty).
+- Relation arrays now return lightweight `GlossIdentifier` entries (`{ language, content }`) to avoid recursive loops.
 
 ---
 
@@ -111,7 +112,9 @@ Body schema (`glossWriteSchema`):
   "containsIds": ["clfj5q3d900001s8l2i9s8kdw"],
   "nearSynonymIds": [],
   "nearHomophoneIds": [],
-  "translationIds": []
+  "translationIds": [],
+  "clarifiesUsageIds": [],
+  "toBeDifferentiatedFromIds": []
 }
 ```
 

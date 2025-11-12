@@ -354,7 +354,7 @@ function formatGlossContent(gloss: GlossDTO): string {
           </div>
           <button
             type="button"
-            class="btn btn-outline btn-xs w-full justify-start"
+            class="btn btn-outline btn-xs justify-start"
             @click.stop="openCreateGlossModal"
             :disabled="isGlossPending"
           >

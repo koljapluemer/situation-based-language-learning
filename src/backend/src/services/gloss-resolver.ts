@@ -1,16 +1,19 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import { GlossDTO, LanguageCode, Note } from "@sbl/shared";
+import { GlossDTO, GlossIdentifier, LanguageCode, Note } from "@sbl/shared";
 import { prisma as defaultClient } from "../lib/prisma";
 
+const relationSelect = { select: { id: true, language: true, content: true } } as const;
+
 const glossInclude = {
-  contains: true,
-  nearSynonyms: true,
-  nearHomophones: true,
-  translations: true,
+  contains: relationSelect,
+  nearSynonyms: relationSelect,
+  nearHomophones: relationSelect,
+  translations: relationSelect,
+  clarifiesUsage: relationSelect,
+  toBeDifferentiatedFrom: relationSelect,
 } satisfies Prisma.GlossInclude;
 
 type GlossNode = Prisma.GlossGetPayload<{ include: typeof glossInclude }>;
-type GlossScalar = Prisma.GlossGetPayload<{}>;
 
 export class GlossResolver {
   constructor(private readonly client: PrismaClient = defaultClient) {}
@@ -20,112 +23,30 @@ export class GlossResolver {
       return new Map();
     }
 
-    const nodes = await this.loadGraph(new Set(glossIds));
-    const memo = new Map<string, GlossDTO>();
-
-    const result = new Map<string, GlossDTO>();
-    glossIds.forEach((id) => {
-      if (nodes.has(id)) {
-        result.set(id, this.buildResolvedGloss(id, nodes, memo));
-      }
+    const glosses = await this.client.gloss.findMany({
+      where: { id: { in: glossIds } },
+      include: glossInclude,
     });
 
-    return result;
+    const map = new Map<string, GlossDTO>();
+    glosses.forEach((gloss) => map.set(gloss.id, this.toDTO(gloss)));
+    return map;
   }
 
   async resolveSingle(glossId: string): Promise<GlossDTO> {
-    const nodes = await this.loadGraph(new Set([glossId]));
-    if (!nodes.has(glossId)) {
+    const gloss = await this.client.gloss.findUnique({
+      where: { id: glossId },
+      include: glossInclude,
+    });
+
+    if (!gloss) {
       throw new Error(`Gloss ${glossId} not found`);
     }
 
-    return this.buildResolvedGloss(glossId, nodes, new Map());
+    return this.toDTO(gloss);
   }
 
-  private async loadGraph(seedIds: Set<string>): Promise<Map<string, GlossNode>> {
-    const nodes = new Map<string, GlossNode>();
-    const queue = new Set(seedIds);
-
-    while (queue.size) {
-      const batch = Array.from(queue);
-      queue.clear();
-
-      const glosses = await this.client.gloss.findMany({
-        where: { id: { in: batch } },
-        include: glossInclude,
-      });
-
-      glosses.forEach((gloss) => {
-        nodes.set(gloss.id, gloss);
-        gloss.contains.forEach((child) => {
-          if (!nodes.has(child.id)) {
-            queue.add(child.id);
-          }
-        });
-      });
-    }
-
-    return nodes;
-  }
-
-  private buildResolvedGloss(
-    glossId: string,
-    nodes: Map<string, GlossNode>,
-    memo: Map<string, GlossDTO>
-  ): GlossDTO {
-    if (memo.has(glossId)) {
-      return memo.get(glossId)!;
-    }
-
-    const node = nodes.get(glossId);
-    if (!node) {
-      throw new Error(`Gloss node ${glossId} missing from graph`);
-    }
-
-    const dto: GlossDTO = {
-      ...this.baseFromNode(node),
-      contains: [],
-      nearSynonyms: [],
-      nearHomophones: [],
-      translations: [],
-    };
-
-    memo.set(glossId, dto);
-
-    dto.contains = node.contains.map((child) =>
-      this.buildResolvedGloss(child.id, nodes, memo)
-    );
-
-    dto.nearSynonyms = node.nearSynonyms.map((gloss) =>
-      this.shallowGloss(gloss, nodes, memo)
-    );
-    dto.nearHomophones = node.nearHomophones.map((gloss) =>
-      this.shallowGloss(gloss, nodes, memo)
-    );
-    dto.translations = node.translations.map((gloss) =>
-      this.shallowGloss(gloss, nodes, memo)
-    );
-
-    return dto;
-  }
-
-  private shallowGloss(
-    gloss: GlossScalar,
-    nodes: Map<string, GlossNode>,
-    memo: Map<string, GlossDTO>
-  ): GlossDTO {
-    if (memo.has(gloss.id)) {
-      return memo.get(gloss.id)!;
-    }
-
-    if (nodes.has(gloss.id)) {
-      return this.buildResolvedGloss(gloss.id, nodes, memo);
-    }
-
-    return { ...this.baseFromNode(gloss), contains: [], nearSynonyms: [], nearHomophones: [], translations: [] };
-  }
-
-  private baseFromNode(gloss: GlossScalar | GlossNode): GlossDTO {
+  private toDTO(gloss: GlossNode): GlossDTO {
     return {
       id: gloss.id,
       language: gloss.language as LanguageCode,
@@ -133,11 +54,23 @@ export class GlossResolver {
       isParaphrased: gloss.isParaphrased,
       transcriptions: gloss.transcriptions ?? [],
       notes: this.parseNotes(gloss.notes),
-      contains: [],
-      nearSynonyms: [],
-      nearHomophones: [],
-      translations: [],
+      contains: this.mapIdentifiers(gloss.contains),
+      nearSynonyms: this.mapIdentifiers(gloss.nearSynonyms),
+      nearHomophones: this.mapIdentifiers(gloss.nearHomophones),
+      translations: this.mapIdentifiers(gloss.translations),
+      clarifiesUsage: this.mapIdentifiers(gloss.clarifiesUsage),
+      toBeDifferentiatedFrom: this.mapIdentifiers(gloss.toBeDifferentiatedFrom),
     };
+  }
+
+  private mapIdentifiers(glosses?: { language: string; content: string }[]): GlossIdentifier[] {
+    if (!glosses?.length) {
+      return [];
+    }
+    return glosses.map((gloss) => ({
+      language: gloss.language as LanguageCode,
+      content: gloss.content,
+    }));
   }
 
   private parseNotes(notes: Prisma.JsonValue | null | undefined): Note[] {

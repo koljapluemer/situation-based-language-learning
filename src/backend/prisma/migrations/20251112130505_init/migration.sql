@@ -79,6 +79,22 @@ CREATE TABLE "_GlossTranslations" (
 );
 
 -- CreateTable
+CREATE TABLE "_GlossClarifiesUsage" (
+    "A" TEXT NOT NULL,
+    "B" TEXT NOT NULL,
+
+    CONSTRAINT "_GlossClarifiesUsage_AB_pkey" PRIMARY KEY ("A","B")
+);
+
+-- CreateTable
+CREATE TABLE "_GlossDifferentiations" (
+    "A" TEXT NOT NULL,
+    "B" TEXT NOT NULL,
+
+    CONSTRAINT "_GlossDifferentiations_AB_pkey" PRIMARY KEY ("A","B")
+);
+
+-- CreateTable
 CREATE TABLE "_ExpressionGlosses" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL,
@@ -111,6 +127,12 @@ CREATE INDEX "_GlossNearHomophones_B_index" ON "_GlossNearHomophones"("B");
 
 -- CreateIndex
 CREATE INDEX "_GlossTranslations_B_index" ON "_GlossTranslations"("B");
+
+-- CreateIndex
+CREATE INDEX "_GlossClarifiesUsage_B_index" ON "_GlossClarifiesUsage"("B");
+
+-- CreateIndex
+CREATE INDEX "_GlossDifferentiations_B_index" ON "_GlossDifferentiations"("B");
 
 -- CreateIndex
 CREATE INDEX "_ExpressionGlosses_B_index" ON "_ExpressionGlosses"("B");
@@ -147,6 +169,18 @@ ALTER TABLE "_GlossTranslations" ADD CONSTRAINT "_GlossTranslations_A_fkey" FORE
 
 -- AddForeignKey
 ALTER TABLE "_GlossTranslations" ADD CONSTRAINT "_GlossTranslations_B_fkey" FOREIGN KEY ("B") REFERENCES "Gloss"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_GlossClarifiesUsage" ADD CONSTRAINT "_GlossClarifiesUsage_A_fkey" FOREIGN KEY ("A") REFERENCES "Gloss"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_GlossClarifiesUsage" ADD CONSTRAINT "_GlossClarifiesUsage_B_fkey" FOREIGN KEY ("B") REFERENCES "Gloss"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_GlossDifferentiations" ADD CONSTRAINT "_GlossDifferentiations_A_fkey" FOREIGN KEY ("A") REFERENCES "Gloss"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_GlossDifferentiations" ADD CONSTRAINT "_GlossDifferentiations_B_fkey" FOREIGN KEY ("B") REFERENCES "Gloss"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_ExpressionGlosses" ADD CONSTRAINT "_ExpressionGlosses_A_fkey" FOREIGN KEY ("A") REFERENCES "ChallengeOfExpression"("id") ON DELETE CASCADE ON UPDATE CASCADE;

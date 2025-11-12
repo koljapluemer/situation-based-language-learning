@@ -6,4 +6,4 @@ export interface LocalizedString {
 }
 
 // aliasing the interface for semantic reasons
-export type GlossIdentfier = LocalizedString
+export type GlossIdentifier = LocalizedString

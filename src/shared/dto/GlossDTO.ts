@@ -1,14 +1,16 @@
-import { GlossIdentfier } from "../LocalizedString";
+import { GlossIdentifier } from "../LocalizedString";
 import { Note } from "../Note";
 
-export interface GlossDTO extends GlossIdentfier {
+export interface GlossDTO extends GlossIdentifier {
     id: string;
     isParaphrased: boolean;
     transcriptions: string[];
     notes: Note[];
 
-    contains: GlossDTO[];
-    nearSynonyms: GlossDTO[];
-    nearHomophones: GlossDTO[];
-    translations: GlossDTO[];
+    contains: GlossIdentifier[];
+    nearSynonyms: GlossIdentifier[];
+    nearHomophones: GlossIdentifier[];
+    translations: GlossIdentifier[];
+    clarifiesUsage: GlossIdentifier[];
+    toBeDifferentiatedFrom: GlossIdentifier[];
 }

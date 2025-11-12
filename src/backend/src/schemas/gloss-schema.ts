@@ -13,6 +13,8 @@ export const glossWriteSchema = z.object({
   nearSynonymIds: idArray(),
   nearHomophoneIds: idArray(),
   translationIds: idArray(),
+  clarifiesUsageIds: idArray(),
+  toBeDifferentiatedFromIds: idArray(),
 });
 
 export const glossUpdateSchema = glossWriteSchema.partial();

@@ -42,6 +42,11 @@ model Gloss {
   translations Gloss[] @relation("GlossTranslations")
   translatedBy Gloss[] @relation("GlossTranslations")
 
+  clarifiesUsage        Gloss[] @relation("GlossClarifiesUsage")
+  clarifiedBy           Gloss[] @relation("GlossClarifiesUsage")
+  toBeDifferentiatedFrom Gloss[] @relation("GlossDifferentiations")
+  differentiationOf      Gloss[] @relation("GlossDifferentiations")
+
   expressionChallenges    ChallengeOfExpression[]      @relation("ExpressionGlosses")
   understandingChallenges ChallengeOfUnderstandingText[] @relation("UnderstandingGlosses")
 
