@@ -1,20 +1,34 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { getSituation, resolveGlossesForChallenge } from '../../entities/situation';
 import type { ChallengeOfUnderstandingTextEntity } from '../../entities/situation/types';
 import type { GlossEntity } from '../../entities/gloss/types';
+import { generateGlossRevealTasks } from '../../tasks/task-understanding-text-gloss-reveal/generate';
+import type { Task, TaskResult } from '../../tasks/types';
+import TaskRenderer from '../../tasks/task-understanding-text-gloss-reveal/Render.vue';
 
 const route = useRoute();
 const router = useRouter();
 
 const situationId = route.params.situationId as string;
 
+// Data loading state
 const challenge = ref<ChallengeOfUnderstandingTextEntity | null>(null);
 const resolvedGlosses = ref<GlossEntity[]>([]);
 const situationIdentifier = ref<string>('');
 const isLoading = ref(true);
 const error = ref<string | null>(null);
+
+// Task orchestration state
+const generatedTasks = ref<Task[]>([]);
+const currentTaskIndex = ref(0);
+const taskResults = ref<TaskResult[]>([]);
+
+// Computed properties
+const currentTask = computed(() => generatedTasks.value[currentTaskIndex.value]);
+const isComplete = computed(() => currentTaskIndex.value >= generatedTasks.value.length);
+const totalTasks = computed(() => generatedTasks.value.length);
 
 onMounted(async () => {
   try {
@@ -45,6 +59,17 @@ onMounted(async () => {
     // Resolve glosses
     resolvedGlosses.value = await resolveGlossesForChallenge(challenge.value.glossIds);
 
+    // Generate tasks from glosses
+    if (resolvedGlosses.value.length === 0) {
+      error.value = 'This challenge has no glosses to practice.';
+      return;
+    }
+
+    generatedTasks.value = generateGlossRevealTasks(
+      resolvedGlosses.value,
+      challenge.value.language
+    );
+
   } catch (err) {
     console.error('Error loading challenge:', err);
     error.value = err instanceof Error ? err.message : 'Failed to load challenge';
@@ -53,88 +78,95 @@ onMounted(async () => {
   }
 });
 
+function handleTaskFinished(result: TaskResult) {
+  // Store the result
+  taskResults.value.push(result);
+
+  // Move to next task
+  currentTaskIndex.value++;
+}
+
 function goBack() {
   router.push({ name: 'situations' });
 }
 
-// Format JSON for display
-const debugData = ref<{ challenge: any; resolvedGlosses: any } | null>(null);
-
-// Update debug data when challenge or glosses change
-onMounted(() => {
-  if (challenge.value) {
-    debugData.value = {
-      challenge: challenge.value,
-      resolvedGlosses: resolvedGlosses.value,
-    };
-  }
-});
+function restartPractice() {
+  // Reset to first task
+  currentTaskIndex.value = 0;
+  taskResults.value = [];
+}
 </script>
 
 <template>
-  <section class="space-y-6">
-    <div class="flex items-center justify-between">
-      <h1>Practice Understanding Text</h1>
-      <button @click="goBack" class="btn btn-outline btn-sm">
-        Back to Situations
-      </button>
-    </div>
+  <!-- Loading State -->
+  <div v-if="isLoading" class="flex flex-col items-center justify-center h-screen gap-4">
+    <span class="loading loading-spinner loading-lg" aria-hidden="true"></span>
+    <p class="text-lg">Loading challenge...</p>
+  </div>
 
-    <!-- Loading State -->
-    <div v-if="isLoading" class="flex items-center gap-2 text-sm text-base-content/70">
-      <span class="loading loading-spinner loading-sm" aria-hidden="true"></span>
-      Loading challenge...
+  <!-- Error State -->
+  <div v-else-if="error" class="flex flex-col items-center justify-center h-screen gap-4 p-4">
+    <div role="alert" class="alert alert-error max-w-md">
+      <span>{{ error }}</span>
     </div>
+    <button @click="goBack" class="btn btn-primary">
+      Go Back
+    </button>
+  </div>
 
-    <!-- Error State -->
-    <div v-else-if="error" class="space-y-4">
-      <div role="alert" class="alert alert-error">
-        <span>{{ error }}</span>
-      </div>
-      <button @click="goBack" class="btn btn-primary">
-        Go Back
-      </button>
-    </div>
+  <!-- Task Renderer -->
+  <div v-else-if="!isComplete && currentTask">
+    <TaskRenderer
+      :task="currentTask"
+      @finished="handleTaskFinished"
+    />
+  </div>
 
-    <!-- Success State -->
-    <div v-else-if="challenge" class="space-y-6">
-      <!-- Situation Info -->
-      <div class="text-sm text-base-content/70">
+  <!-- Completion Screen -->
+  <div v-else-if="isComplete" class="flex flex-col items-center justify-center h-screen gap-6 p-4">
+    <div class="text-center space-y-4">
+      <h1 class="text-4xl font-bold">Practice Complete! 🎉</h1>
+      <p class="text-xl">
+        You completed {{ totalTasks }} task{{ totalTasks !== 1 ? 's' : '' }}
+      </p>
+      <div class="text-base-content/70">
         Situation: <span class="font-semibold">{{ situationIdentifier }}</span>
       </div>
 
-      <!-- Challenge Display -->
-      <div class="card shadow">
+      <!-- Task results summary -->
+      <div class="card shadow-lg max-w-md mx-auto">
         <div class="card-body">
-          <h2 class="card-title">Challenge</h2>
-
-          <!-- Language Badge -->
-          <div class="flex items-center gap-2">
-            <span class="badge badge-primary">{{ challenge.language }}</span>
+          <h3 class="card-title text-lg">Ratings</h3>
+          <div class="flex flex-col gap-2">
+            <div class="flex justify-between">
+              <span>Again (1):</span>
+              <span class="badge badge-error">{{ taskResults.filter(r => r.rating === 1).length }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Hard (2):</span>
+              <span class="badge badge-warning">{{ taskResults.filter(r => r.rating === 2).length }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Good (3):</span>
+              <span class="badge badge-info">{{ taskResults.filter(r => r.rating === 3).length }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Easy (4):</span>
+              <span class="badge badge-success">{{ taskResults.filter(r => r.rating === 4).length }}</span>
+            </div>
           </div>
-
-          <!-- Challenge Text -->
-          <div class="text-lg font-medium mt-4">
-            {{ challenge.text }}
-          </div>
-
-          <!-- Gloss Count -->
-          <div class="text-sm text-base-content/70 mt-2">
-            {{ challenge.glossIds.length }} gloss{{ challenge.glossIds.length !== 1 ? 'es' : '' }}
-          </div>
-        </div>
-      </div>
-
-      <!-- Debug Data -->
-      <div class="card shadow">
-        <div class="card-body">
-          <h3 class="card-title text-base">Debug Data</h3>
-          <div class="text-sm text-base-content/70 mb-2">
-            Raw challenge and resolved gloss data:
-          </div>
-          <pre class="bg-base-200 p-4 rounded-lg overflow-x-auto text-xs">{{ JSON.stringify({ challenge, resolvedGlosses }, null, 2) }}</pre>
         </div>
       </div>
     </div>
-  </section>
+
+    <!-- Action buttons -->
+    <div class="flex gap-4">
+      <button @click="restartPractice" class="btn btn-outline">
+        Practice Again
+      </button>
+      <button @click="goBack" class="btn btn-primary">
+        Back to Situations
+      </button>
+    </div>
+  </div>
 </template>
