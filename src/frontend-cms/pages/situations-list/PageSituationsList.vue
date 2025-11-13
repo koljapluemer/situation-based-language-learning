@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import type { SituationDTO } from "@sbl/shared";
+import { LANGUAGES, type SituationDTO } from "@sbl/shared";
 import { Eye } from "lucide-vue-next";
 import ModalCreateSituation from "../../features/situation-create/ModalCreateSituation.vue";
 import { useModalCreateSituation } from "../../features/situation-create/index";
@@ -15,6 +15,14 @@ const errorMessage = ref<string | null>(null);
 
 const { open, close } = useModalCreateSituation();
 const toast = useToast();
+
+function getEnglishDescription(situation: SituationDTO) {
+  return situation.descriptions.find((desc) => desc.language === "eng")?.content ?? "No English description";
+}
+
+function getLanguageInfo(code: string) {
+  return LANGUAGES[code] ?? null;
+}
 
 async function loadSituations() {
   isLoading.value = true;
@@ -108,30 +116,29 @@ onMounted(loadSituations);
       <table class="table table-zebra">
         <thead>
           <tr>
-            <th>#</th>
-            <th>Identifier</th>
-            <th>Descriptions</th>
+            <th>English Description</th>
+            <th>Target Language</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="!situations.length">
-            <td colspan="4" class="py-8 text-center text-base-content/70">
+            <td colspan="3" class="py-8 text-center text-base-content/70">
               No situations found.
             </td>
           </tr>
-          <tr v-for="(situation, index) in situations" :key="situation.identifier">
-            <td>{{ index + 1 }}</td>
-            <td class="font-semibold">{{ situation.identifier }}</td>
-            <td class="max-w-xl whitespace-pre-line text-sm">
-              <ul class="list-disc list-inside space-y-1">
-                <li v-for="desc in situation.descriptions" :key="desc.language + desc.content">
-                  <span class="font-medium uppercase text-xs tracking-wide text-base-content/70">
-                    {{ desc.language }}:
-                  </span>
-                  {{ desc.content }}
-                </li>
-              </ul>
+          <tr v-for="situation in situations" :key="situation.identifier">
+            <td class="max-w-2xl whitespace-pre-line text-sm">
+              {{ getEnglishDescription(situation) }}
+            </td>
+            <td class="font-semibold">
+              <span class="inline-flex items-center gap-2">
+                <span v-if="getLanguageInfo(situation.targetLanguage)?.emoji" aria-hidden="true">
+                  {{ getLanguageInfo(situation.targetLanguage)?.emoji }}
+                </span>
+                {{ getLanguageInfo(situation.targetLanguage)?.name ?? situation.targetLanguage }}
+                <span class="text-xs uppercase text-base-content/60">({{ situation.targetLanguage }})</span>
+              </span>
             </td>
             <td>
               <router-link

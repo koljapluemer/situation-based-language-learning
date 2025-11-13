@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import { ChevronRight, ChevronDown, Edit, ExternalLink } from "lucide-vue-next";
-import type { SituationDTO, LocalizedString } from "@sbl/shared";
+import { LANGUAGES, type SituationDTO, type LocalizedString } from "@sbl/shared";
 import { useToast } from "../../dumb/toasts/index";
 import ChallengeItemExpression from "./ChallengeItemExpression.vue";
 import ChallengeItemUnderstanding from "./ChallengeItemUnderstanding.vue";
@@ -46,6 +46,11 @@ const { data: situation, isLoading, error, refetch } = useQuery({
   },
   refetchOnWindowFocus: true,
   staleTime: 30 * 1000,
+});
+
+const languageInfo = computed(() => {
+  const code = situation.value?.targetLanguage;
+  return code ? LANGUAGES[code] ?? null : null;
 });
 
 function goBack() {
@@ -141,6 +146,16 @@ async function handleUpdateSituation(identifier: string, descriptions: Localized
           <div class="flex items-start justify-between gap-4">
             <div class="flex-1">
               <h2 class="card-title">{{ situation.identifier }}</h2>
+              <p class="mt-1 text-sm text-base-content/70 flex items-center gap-2">
+                <span class="font-medium uppercase text-xs tracking-wide text-base-content/70">
+                  Target language:
+                </span>
+                <span class="inline-flex items-center gap-1">
+                  <span v-if="languageInfo?.emoji" aria-hidden="true">{{ languageInfo?.emoji }}</span>
+                  {{ languageInfo?.name ?? situation.targetLanguage }}
+                  <span class="text-xs uppercase text-base-content/60">({{ situation.targetLanguage }})</span>
+                </span>
+              </p>
               <div v-if="situation.descriptions.length" class="space-y-1 mt-2">
                 <p v-for="desc in situation.descriptions" :key="desc.language" class="text-sm">
                   <span class="font-medium uppercase text-xs tracking-wide text-base-content/70">
