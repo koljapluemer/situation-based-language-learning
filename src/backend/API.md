@@ -50,8 +50,8 @@ interface SituationDTO {
   descriptions: LocalizedString[];
   imageLink?: string;
   targetLanguage: LanguageCode;
-  challengesOfExpression: ChallengeOfExpression[];
-  challengesOfUnderstandingText: ChallengeOfUnderstandingText[];
+  challengesOfExpression: GlossDTO[];
+  challengesOfUnderstandingText: GlossDTO[];
 }
 
 interface SituationSummaryDTO {
@@ -198,7 +198,7 @@ Query parameters:
 | --- | --- | --- |
 | `identifier` | Optional | Filter by identifier. |
 | `targetLanguage` | Optional | Filter by target language code (e.g., "spa", "deu"). |
-| `nativeLanguages` | Optional | Comma-separated list of user's native languages (e.g., "eng,deu"). When provided, returns only ONE prompt per challenge (best matching language from the priority list, or English fallback). Gloss trees are pruned so expression challenges only surface native-language glosses (with translations locked to the target language) and understanding challenges only surface target-language glosses (with translations locked to the selected native language). |
+| `nativeLanguages` | Optional | Comma-separated list of user's native languages (e.g., "eng,deu"). When provided, the backend filters glosses: expression challenges return only glosses in the native language (with their `translations` and `contains` filtered appropriately), while understanding challenges return only glosses in the target language (with their `translations` and `contains` filtered appropriately). |
 
 Response: `{ "data": [SituationDTO, ...] }`.
 
@@ -232,7 +232,7 @@ Query parameters:
 
 | Param | Required | Description |
 | --- | --- | --- |
-| `nativeLanguages` | Optional | Comma-separated list of user's native languages (e.g., "eng,deu"). When provided, returns only ONE prompt per challenge (best matching language from the priority list, or English fallback). Gloss trees follow the same pruning rules as the list endpoint: expression challenges expose native-language glosses with target-language translations, while understanding challenges expose target-language glosses with native-language translations. |
+| `nativeLanguages` | Optional | Comma-separated list of user's native languages (e.g., "eng,deu"). When provided, the backend filters glosses: expression challenges return only glosses in the native language (with their `translations` and `contains` filtered appropriately), while understanding challenges return only glosses in the target language (with their `translations` and `contains` filtered appropriately). |
 
 Response is `{ "data": SituationDTO }`.
 
@@ -253,23 +253,8 @@ Body schema (`situationWriteSchema`):
   ],
   "imageLink": "https://example.com/images/greeting.jpg",
   "targetLanguage": "spa",
-  "challengesOfExpression": [
-    {
-      "identifier": "saluda-a-un-amigo",
-      "prompts": [
-        { "language": "eng", "content": "Greet a friend" },
-        { "language": "spa", "content": "Saluda a un amigo" }
-      ],
-      "glossIds": ["clfj5q3d900001s8l2i9s8kdw"]
-    }
-  ],
-  "challengesOfUnderstandingText": [
-    {
-      "text": "Hola, ¿cómo estás?",
-      "language": "spa",
-      "glossIds": ["clfj5q3d900001s8l2i9s8kdw"]
-    }
-  ]
+  "challengesOfExpressionIds": ["clm1a2b3c4d5e6f7g8h9i0j1k"],
+  "challengesOfUnderstandingTextIds": ["cln2b3c4d5e6f7g8h9i0j1k2l"]
 }
 ```
 
@@ -278,21 +263,22 @@ Notes:
 - `targetLanguage` is required and specifies the language being learned (e.g., "spa" for Spanish situations).
 - `imageLink` is optional and must be a valid URL if provided.
 - `descriptions` should include UI-friendly text in multiple languages to describe the situation.
-- Expression challenges must include at least one English prompt; additional languages are optional.
-- Challenge arrays default to `[]`; omit them to create empty situations.
+- `challengesOfExpressionIds`: Array of gloss IDs in the native language (prompts for expression practice). Defaults to `[]`.
+- `challengesOfUnderstandingTextIds`: Array of gloss IDs in the target language (text for comprehension practice). Defaults to `[]`.
+- Glosses must be created separately via `/glosses` before attaching to situations.
 - Glosses are unique per `(language, content)`. When a matching entry already exists, attach its `id` instead of creating a duplicate (`/glosses/search` helps surface candidates).
 
 ### Update
 
 ```
-PATCH /situations/:id?language=spa
+PATCH /situations/:id?nativeLanguages=eng
 ```
 
 Where `:id` is the situation identifier (e.g., `greeting-basic`).
 
-- Request body uses `situationUpdateSchema`.
-- Providing `challengesOfExpression` or `challengesOfUnderstandingText` replaces all existing challenges of that type (internally a delete + recreate).
-- The `language` query parameter controls the response DTO.
+- Request body uses `situationUpdateSchema` (partial updates).
+- Providing `challengesOfExpressionIds` or `challengesOfUnderstandingTextIds` replaces the entire gloss ID array for that challenge type.
+- The `nativeLanguages` query parameter controls gloss filtering in the response DTO (same as GET).
 
 ### Delete
 
@@ -302,7 +288,7 @@ DELETE /situations/:id
 
 Where `:id` is the situation identifier (e.g., `greeting-basic`).
 
-Also deletes associated challenges (cascade).
+Removes the situation and its gloss associations. Glosses themselves are not deleted (they remain in the catalog for reuse).
 
 ---
 

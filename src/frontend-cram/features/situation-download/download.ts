@@ -22,7 +22,7 @@ export async function downloadSituationSummaries(
 }
 
 /**
- * Download full situation details including challenges and glosses
+ * Download full situation details including glosses
  * Performs smart merge:
  * - Situations merged by identifier
  * - Glosses deduplicated by [language+content]
@@ -33,21 +33,18 @@ export async function downloadSituation(
 ): Promise<void> {
   const situation = await fetchSituation(identifier, nativeLanguages);
 
-  // Extract all unique glosses from all challenges
-  const allGlosses = new Map<string, typeof situation.challengesOfExpression[0]['glosses'][0]>();
+  // Extract all unique glosses from challenge arrays
+  // Challenges ARE glosses in the new architecture (no wrapper objects)
+  const allGlosses = new Map<string, typeof situation.challengesOfExpression[0]>();
 
-  // Collect glosses from expression challenges
-  situation.challengesOfExpression.forEach(challenge => {
-    challenge.glosses.forEach(gloss => {
-      allGlosses.set(gloss.id, gloss);
-    });
+  // Collect glosses from expression challenges (already GlossDTO[])
+  situation.challengesOfExpression.forEach(gloss => {
+    allGlosses.set(gloss.id, gloss);
   });
 
-  // Collect glosses from understanding challenges
-  situation.challengesOfUnderstandingText.forEach(challenge => {
-    challenge.glosses.forEach(gloss => {
-      allGlosses.set(gloss.id, gloss);
-    });
+  // Collect glosses from understanding challenges (already GlossDTO[])
+  situation.challengesOfUnderstandingText.forEach(gloss => {
+    allGlosses.set(gloss.id, gloss);
   });
 
   // Upsert all glosses (smart merge by [language+content])
