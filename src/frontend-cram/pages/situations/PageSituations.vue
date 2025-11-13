@@ -228,7 +228,12 @@ watch(situations, () => {
             >
               Downloaded
             </span>
-            <button class="btn btn-primary btn-sm">Start</button>
+            <button
+              @click="router.push({ name: 'practice-understanding-text', params: { situationId: situation.identifier } })"
+              class="btn btn-primary btn-sm"
+            >
+              Start
+            </button>
           </div>
         </div>
       </div>
