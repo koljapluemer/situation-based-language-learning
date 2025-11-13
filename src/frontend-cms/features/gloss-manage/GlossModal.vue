@@ -59,13 +59,6 @@ const primaryLabel = computed(() => {
   return props.mode === "create" ? "Create" : "Save";
 });
 
-const lockedLanguageLabel = computed(() => {
-  if (!props.lockedLanguage) return null;
-  const lang = LANGUAGES[props.lockedLanguage];
-  if (!lang) return props.lockedLanguage;
-  return lang.emoji ? `${lang.emoji} ${lang.name} (${props.lockedLanguage})` : `${lang.name} (${props.lockedLanguage})`;
-});
-
 watch(
   () => props.show,
   (show) => {
@@ -278,8 +271,11 @@ function selectSuggestion(gloss: GlossDTO) {
         <form @submit.prevent="handleSubmit" class="space-y-4">
           <fieldset class="fieldset">
             <label for="gloss-language" class="label">Language</label>
-            <p v-if="lockedLanguageLabel" class="py-2">{{ lockedLanguageLabel }}</p>
-            <LanguageSelect v-else id="gloss-language" v-model="form.language" />
+            <LanguageSelect
+              id="gloss-language"
+              v-model="form.language"
+              :disabled="Boolean(props.lockedLanguage)"
+            />
           </fieldset>
 
           <fieldset class="fieldset">

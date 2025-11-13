@@ -30,10 +30,14 @@ const selectedNativeLanguage = ref<LanguageCode>("eng");
 const { open: openEditModal } = useModalEditSituation();
 
 // Fetch situation with TanStack Query
-const { data: situation, isLoading, error, refetch } = useQuery({
-  queryKey: ["situation", situationId],
-  queryFn: async () => {
-    const response = await fetch(`${API_BASE_URL}/situations/${situationId}?language=eng`);
+const situationQueryKey = computed(() => ["situation", situationId, selectedNativeLanguage.value]);
+
+const { data: situation, isLoading, error } = useQuery({
+  queryKey: situationQueryKey,
+  queryFn: async ({ queryKey }) => {
+    const [, id, nativeLanguage] = queryKey as [string, string, LanguageCode?];
+    const languageParam = nativeLanguage ?? "eng";
+    const response = await fetch(`${API_BASE_URL}/situations/${id}?language=${languageParam}`);
     if (!response.ok) {
       if (response.status === 404) {
         throw new Error("Situation not found");
@@ -214,7 +218,8 @@ async function handleUpdateSituation(identifier: string, descriptions: Localized
               <div v-else class="space-y-1">
                 <ChallengeItemExpression v-for="(challenge, index) in situation.challengesOfExpression" :key="index"
                   :challenge="challenge" :situation-id="situationId" :index="index"
-                  :native-language="selectedNativeLanguage" @deleted="handleChallengeDeleted"
+                  :native-language="selectedNativeLanguage" :target-language="situation.targetLanguage"
+                  @deleted="handleChallengeDeleted"
                   @updated="handleChallengeUpdated" />
               </div>
               <div>

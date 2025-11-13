@@ -19,6 +19,7 @@ const props = defineProps<{
   situationId: string;
   index: number;
   nativeLanguage: LanguageCode;
+  targetLanguage: LanguageCode;
 }>();
 
 const emit = defineEmits<{
@@ -38,6 +39,8 @@ const editedPrompt = ref(englishPrompt.value);
 const showGlossModal = ref(false);
 const isGlossPending = ref(false);
 const nativeLanguage = computed(() => props.nativeLanguage);
+const targetLanguage = computed(() => props.targetLanguage);
+const situationQueryKey = computed(() => ["situation", props.situationId, nativeLanguage.value]);
 const filteredGlosses = computed(() =>
   props.challenge.glosses.filter((gloss) => gloss.language === nativeLanguage.value)
 );
@@ -54,7 +57,7 @@ watch(
 
 const deleteMutation = useMutation({
   mutationFn: async () => {
-    const situation = queryClient.getQueryData<SituationDTO>(["situation", props.situationId]);
+    const situation = queryClient.getQueryData<SituationDTO>(situationQueryKey.value);
     if (!situation) throw new Error("Situation not found in cache");
 
     const updatedChallenges = situation.challengesOfExpression
@@ -76,7 +79,7 @@ const deleteMutation = useMutation({
 
 const updateMutation = useMutation({
   mutationFn: async (newPrompt: string) => {
-    const situation = queryClient.getQueryData<SituationDTO>(["situation", props.situationId]);
+    const situation = queryClient.getQueryData<SituationDTO>(situationQueryKey.value);
     if (!situation) throw new Error("Situation not found in cache");
 
     const updatedChallenges = situation.challengesOfExpression.map((challenge, i) => {
@@ -154,7 +157,7 @@ async function handleGlossSaved(gloss: GlossDTO, meta?: { existed: boolean }) {
 }
 
 async function detachGloss(glossId: string) {
-  const situation = queryClient.getQueryData<SituationDTO>(["situation", props.situationId]);
+  const situation = queryClient.getQueryData<SituationDTO>(situationQueryKey.value);
   if (!situation) throw new Error("Situation not found in cache");
 
   isGlossPending.value = true;
@@ -184,7 +187,7 @@ async function detachGloss(glossId: string) {
 }
 
 async function attachGloss(glossId: string) {
-  const situation = queryClient.getQueryData<SituationDTO>(["situation", props.situationId]);
+  const situation = queryClient.getQueryData<SituationDTO>(situationQueryKey.value);
   if (!situation) throw new Error("Situation not found in cache");
 
   const updatedChallenges = situation.challengesOfExpression.map((challenge, i) => {
@@ -312,7 +315,7 @@ function updateEnglishPrompt(prompts: LocalizedString[], content: string): Local
 
         <div class="space-y-2">
           <div v-if="!filteredGlosses.length" class="text-sm text-light italic">
-            No glosses in this language.
+            No glosses in the native language.
           </div>
           <div v-else class="space-y-2">
             <GlossTreeNode
@@ -320,6 +323,8 @@ function updateEnglishPrompt(prompts: LocalizedString[], content: string): Local
               :key="gloss.id"
               :gloss="gloss"
               :lock-language="true"
+              :enforce-language="nativeLanguage"
+              :translation-language="targetLanguage"
               detachable
               @detach="detachGloss(gloss.id)"
               @changed="emit('updated')"

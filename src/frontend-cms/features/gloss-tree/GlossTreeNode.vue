@@ -13,6 +13,7 @@ const props = defineProps<{
   depth?: number;
   detachable?: boolean;
   translationLanguage?: LanguageCode;
+  enforceLanguage?: LanguageCode;
   lockLanguage?: boolean;
 }>();
 
@@ -38,6 +39,13 @@ const filteredTranslations = computed(() => {
     return list;
   }
   return list.filter((ref) => ref.language === props.translationLanguage);
+});
+const filteredContains = computed(() => {
+  const list = localGloss.value?.contains ?? [];
+  if (!props.enforceLanguage) {
+    return list;
+  }
+  return list.filter((ref) => ref.language === props.enforceLanguage);
 });
 
 const childGlosses = reactive<Record<string, GlossDTO>>({});
@@ -112,7 +120,8 @@ function openEditSelf() {
   modalMode.value = "edit";
   relationContext.value = null;
   modalInitial.value = localGloss.value;
-  setModalLanguages(localGloss.value.language, props.lockLanguage);
+  const lock = props.lockLanguage || Boolean(props.enforceLanguage);
+  setModalLanguages(localGloss.value.language, lock);
   showModal.value = true;
 }
 
@@ -143,9 +152,11 @@ function startAddRelation(type: RelationType) {
   modalMode.value = "create";
   modalInitial.value = null;
   if (type === "contains") {
-    setModalLanguages(localGloss.value?.language, props.lockLanguage);
+    const lang = props.enforceLanguage ?? localGloss.value?.language;
+    setModalLanguages(lang, Boolean(props.enforceLanguage));
   } else {
-    setModalLanguages(props.translationLanguage, true);
+    const lang = props.translationLanguage ?? localGloss.value?.language;
+    setModalLanguages(lang, Boolean(props.translationLanguage));
   }
   showModal.value = true;
 }
@@ -156,7 +167,8 @@ async function openEditRelation(reference: GlossReference) {
     modalMode.value = "edit";
     relationContext.value = null;
     modalInitial.value = gloss;
-    setModalLanguages(gloss.language, props.lockLanguage);
+    const lock = Boolean(props.translationLanguage) || props.lockLanguage;
+    setModalLanguages(props.translationLanguage ?? gloss.language, lock);
     showModal.value = true;
   } catch (error) {
     toast.error(error instanceof Error ? error.message : "Failed to load gloss");
@@ -273,7 +285,7 @@ async function updateRelations(type: RelationType, ids: string[]) {
 
 function relationEmpty(type: RelationType) {
   if (type === "contains") {
-    return (localGloss.value?.contains?.length ?? 0) === 0;
+    return filteredContains.value.length === 0;
   }
   return filteredTranslations.value.length === 0;
 }
@@ -349,15 +361,18 @@ async function fetchReferenceSummary(glossId: string) {
 
           <div class="mt-2 space-y-2">
             <div v-if="relationEmpty('contains')" class="text-sm text-light italic">
-              No child glosses yet.
+              No child glosses in this language.
             </div>
             <div v-else class="space-y-3">
-              <div v-for="reference in localGloss?.contains ?? []" :key="reference.id">
+              <div v-for="reference in filteredContains" :key="reference.id">
                 <GlossTreeNode
                   v-if="childGlosses[reference.id]"
                   :gloss="childGlosses[reference.id]"
                   :depth="(props.depth ?? 0) + 1"
                   detachable
+                  :lock-language="props.lockLanguage"
+                  :enforce-language="props.enforceLanguage"
+                  :translation-language="props.translationLanguage"
                   @detach="detachRelation('contains', reference)"
                   @changed="handleChildChanged"
                 />

@@ -27,9 +27,9 @@
 - The gloss section within a challenge delegates to `GlossTreeNode`. This component understands three use cases simultaneously: (1) inspect nested contains/translations, (2) attach brand new glosses via modal, and (3) edit/detach existing ones without leaving the tree.
 
 ### Language Controls
-- The situation view now exposes a single native-language dropdown (default `eng`). Expression challenges only render glosses whose `language` matches this selection so editors can focus on one learner language at a time.
-- Gloss additions no longer expose arbitrary language pickers: expression glosses always use the selected native language, while understanding glosses (and their contained children) always use the situation’s target language.
-- When expanding gloss translations inside understanding challenges we filter the list to the selected native language, and adding a translation automatically locks the modal to that language. This keeps translation pairs predictable and removes accidental cross-language attachments.
+- The situation view exposes a single native-language dropdown (default `eng`). Changing it refetches the situation so every challenge tree is rebuilt for that learner language.
+- Expression challenges are strictly native-language trees: top-level glosses and every `contains` descendant must be in the selected native language, while their translations are filtered/locked to the situation’s target language.
+- Understanding challenges invert the rule: glosses plus recursive `contains` chains are locked to the situation’s target language, and their translations are filtered/locked to the selected native language so authors only see the learner-facing explanations they care about.
 
 ### Modal Responsibilities
 - `GlossModal` is intentionally minimal: language/content plus the handful of gloss metadata we care about (`isParaphrased`, transcriptions, notes). It always posts to `/glosses` on “create” and returns the saved DTO. The caller decides what to do with the resulting `id` (e.g., attach it to a challenge or to another gloss relation).

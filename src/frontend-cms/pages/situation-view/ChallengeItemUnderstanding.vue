@@ -40,6 +40,10 @@ const showGlossModal = ref(false);
 const isGlossPending = ref(false);
 const targetLanguage = computed(() => props.targetLanguage);
 const nativeLanguage = computed(() => props.nativeLanguage);
+const situationQueryKey = computed(() => ["situation", props.situationId, nativeLanguage.value]);
+const filteredGlosses = computed(() =>
+  props.challenge.glosses.filter((gloss) => gloss.language === targetLanguage.value)
+);
 
 watch(
   () => props.challenge,
@@ -54,7 +58,7 @@ watch(
 
 const deleteMutation = useMutation({
   mutationFn: async () => {
-    const situation = queryClient.getQueryData<SituationDTO>(["situation", props.situationId]);
+    const situation = queryClient.getQueryData<SituationDTO>(situationQueryKey.value);
     if (!situation) throw new Error("Situation not found in cache");
 
     const updatedChallenges = situation.challengesOfUnderstandingText
@@ -76,7 +80,7 @@ const deleteMutation = useMutation({
 
 const updateMutation = useMutation({
   mutationFn: async ({ text, language }: { text: string; language: LanguageCode }) => {
-    const situation = queryClient.getQueryData<SituationDTO>(["situation", props.situationId]);
+    const situation = queryClient.getQueryData<SituationDTO>(situationQueryKey.value);
     if (!situation) throw new Error("Situation not found in cache");
 
     const updatedChallenges = situation.challengesOfUnderstandingText.map((challenge, i) =>
@@ -163,7 +167,7 @@ async function handleGlossSaved(gloss: GlossDTO, meta?: { existed: boolean }) {
 }
 
 async function attachGloss(glossId: string) {
-  const situation = queryClient.getQueryData<SituationDTO>(["situation", props.situationId]);
+  const situation = queryClient.getQueryData<SituationDTO>(situationQueryKey.value);
   if (!situation) throw new Error("Situation not found in cache");
 
   const updatedChallenges = situation.challengesOfUnderstandingText.map((challenge, i) => {
@@ -183,7 +187,7 @@ async function attachGloss(glossId: string) {
 }
 
 async function detachGloss(glossId: string) {
-  const situation = queryClient.getQueryData<SituationDTO>(["situation", props.situationId]);
+  const situation = queryClient.getQueryData<SituationDTO>(situationQueryKey.value);
   if (!situation) throw new Error("Situation not found in cache");
 
   isGlossPending.value = true;
@@ -307,15 +311,16 @@ function toUnderstandingWritePayload(
         </div>
 
         <div class="space-y-2">
-          <div v-if="!challenge.glosses.length" class="text-sm text-light italic">
-            No glosses attached yet.
+          <div v-if="!filteredGlosses.length" class="text-sm text-light italic">
+            No glosses in the target language.
           </div>
           <div v-else class="space-y-2">
             <GlossTreeNode
-              v-for="gloss in challenge.glosses"
+              v-for="gloss in filteredGlosses"
               :key="gloss.id"
               :gloss="gloss"
               :lock-language="true"
+              :enforce-language="targetLanguage"
               :translation-language="nativeLanguage"
               detachable
               @detach="detachGloss(gloss.id)"
