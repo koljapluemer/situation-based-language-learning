@@ -198,7 +198,7 @@ Query parameters:
 | --- | --- | --- |
 | `identifier` | Optional | Filter by identifier. |
 | `targetLanguage` | Optional | Filter by target language code (e.g., "spa", "deu"). |
-| `nativeLanguages` | Optional | Comma-separated list of user's native languages (e.g., "eng,deu"). When provided, returns only ONE prompt per challenge (best matching language from the priority list, or English fallback), and filters glosses to only include target language + native languages. |
+| `nativeLanguages` | Optional | Comma-separated list of user's native languages (e.g., "eng,deu"). When provided, returns only ONE prompt per challenge (best matching language from the priority list, or English fallback). Gloss trees are pruned so expression challenges only surface native-language glosses (with translations locked to the target language) and understanding challenges only surface target-language glosses (with translations locked to the selected native language). |
 
 Response: `{ "data": [SituationDTO, ...] }`.
 
@@ -232,7 +232,7 @@ Query parameters:
 
 | Param | Required | Description |
 | --- | --- | --- |
-| `nativeLanguages` | Optional | Comma-separated list of user's native languages (e.g., "eng,deu"). When provided, returns only ONE prompt per challenge (best matching language from the priority list, or English fallback), and filters glosses to only include target language + native languages. |
+| `nativeLanguages` | Optional | Comma-separated list of user's native languages (e.g., "eng,deu"). When provided, returns only ONE prompt per challenge (best matching language from the priority list, or English fallback). Gloss trees follow the same pruning rules as the list endpoint: expression challenges expose native-language glosses with target-language translations, while understanding challenges expose target-language glosses with native-language translations. |
 
 Response is `{ "data": SituationDTO }`.
 

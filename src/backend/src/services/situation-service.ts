@@ -266,12 +266,13 @@ export class SituationService {
     nativeLanguages?: LanguageCode[]
   ): ChallengeOfExpression {
     const prompts = this.parseLocalizedStrings(challenge.prompts);
-    const glosses = challenge.glosses.map((gloss) => this.pickGloss(gloss.id, glossMap));
+    const nativeLanguage = this.selectNativeLanguage(nativeLanguages);
+    const glosses = this.filterExpressionGlosses(challenge, glossMap, targetLanguage, nativeLanguage);
 
     return {
       identifier: challenge.identifier,
       prompts: this.filterLocalizedStrings(prompts, nativeLanguages),
-      glosses: this.filterGlosses(glosses, targetLanguage, nativeLanguages),
+      glosses,
     };
   }
 
@@ -281,12 +282,13 @@ export class SituationService {
     targetLanguage: LanguageCode,
     nativeLanguages?: LanguageCode[]
   ): ChallengeOfUnderstandingText {
-    const glosses = challenge.glosses.map((gloss) => this.pickGloss(gloss.id, glossMap));
+    const nativeLanguage = this.selectNativeLanguage(nativeLanguages);
+    const glosses = this.filterUnderstandingGlosses(challenge, glossMap, targetLanguage, nativeLanguage);
 
     return {
       text: challenge.text,
       language: challenge.language as LanguageCode,
-      glosses: this.filterGlosses(glosses, targetLanguage, nativeLanguages),
+      glosses,
     };
   }
 
@@ -343,16 +345,78 @@ export class SituationService {
     return strings.slice(0, 1);
   }
 
-  private filterGlosses(
-    glosses: GlossDTO[],
+  private selectNativeLanguage(nativeLanguages?: LanguageCode[]): LanguageCode | undefined {
+    return nativeLanguages && nativeLanguages.length ? nativeLanguages[0] : undefined;
+  }
+
+  private filterExpressionGlosses(
+    challenge: SituationWithRelations["challengesOfExpression"][number],
+    glossMap: Map<string, GlossDTO>,
     targetLanguage: LanguageCode,
-    nativeLanguages?: LanguageCode[]
+    nativeLanguage?: LanguageCode
   ): GlossDTO[] {
-    if (!nativeLanguages || nativeLanguages.length === 0) {
+    const glosses = challenge.glosses
+      .map((gloss) => this.cloneGloss(this.pickGloss(gloss.id, glossMap)))
+      .map((gloss) =>
+        this.pruneGlossRelations(gloss, {
+          containsLanguage: nativeLanguage,
+          translationLanguage: targetLanguage,
+        })
+      );
+
+    if (!nativeLanguage) {
       return glosses;
     }
-    const allowedLanguages = new Set([targetLanguage, ...nativeLanguages]);
-    return glosses.filter(g => allowedLanguages.has(g.language));
+
+    return glosses.filter((gloss) => gloss.language === nativeLanguage);
+  }
+
+  private filterUnderstandingGlosses(
+    challenge: SituationWithRelations["challengesOfUnderstanding"][number],
+    glossMap: Map<string, GlossDTO>,
+    targetLanguage: LanguageCode,
+    nativeLanguage?: LanguageCode
+  ): GlossDTO[] {
+    const glosses = challenge.glosses
+      .map((gloss) => this.cloneGloss(this.pickGloss(gloss.id, glossMap)))
+      .map((gloss) =>
+        this.pruneGlossRelations(gloss, {
+          containsLanguage: targetLanguage,
+          translationLanguage: nativeLanguage,
+        })
+      )
+      .filter((gloss) => gloss.language === targetLanguage);
+
+    return glosses;
+  }
+
+  private pruneGlossRelations(
+    gloss: GlossDTO,
+    options: { containsLanguage?: LanguageCode; translationLanguage?: LanguageCode }
+  ): GlossDTO {
+    const clone = this.cloneGloss(gloss);
+
+    if (options.containsLanguage) {
+      clone.contains = clone.contains.filter((ref) => ref.language === options.containsLanguage);
+    }
+
+    if (options.translationLanguage) {
+      clone.translations = clone.translations.filter((ref) => ref.language === options.translationLanguage);
+    }
+
+    return clone;
+  }
+
+  private cloneGloss(gloss: GlossDTO): GlossDTO {
+    return {
+      ...gloss,
+      contains: gloss.contains.map((ref) => ({ ...ref })),
+      nearSynonyms: gloss.nearSynonyms.map((ref) => ({ ...ref })),
+      nearHomophones: gloss.nearHomophones.map((ref) => ({ ...ref })),
+      translations: gloss.translations.map((ref) => ({ ...ref })),
+      clarifiesUsage: gloss.clarifiesUsage.map((ref) => ({ ...ref })),
+      toBeDifferentiatedFrom: gloss.toBeDifferentiatedFrom.map((ref) => ({ ...ref })),
+    };
   }
 
   private async ensureExists(id: string) {
