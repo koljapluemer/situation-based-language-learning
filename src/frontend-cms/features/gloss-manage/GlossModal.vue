@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
 import type { GlossDTO, LanguageCode, Note } from "@sbl/shared";
+import { LANGUAGES } from "@sbl/shared";
 import LanguageSelect from "../../dumb/LanguageSelect.vue";
 import { useToast } from "../../dumb/toasts";
 
@@ -14,6 +15,7 @@ const props = defineProps<{
     language?: LanguageCode;
     content?: string;
   };
+  lockedLanguage?: LanguageCode;
 }>();
 
 const emit = defineEmits<{
@@ -34,7 +36,7 @@ interface FormState {
 }
 
 const form = reactive<FormState>({
-  language: props.initialGloss?.language ?? props.defaults?.language ?? "eng",
+  language: resolveLanguage(),
   content: props.initialGloss?.content ?? props.defaults?.content ?? "",
   isParaphrased: props.initialGloss?.isParaphrased ?? false,
   transcriptions: props.initialGloss?.transcriptions ? [...props.initialGloss.transcriptions] : [],
@@ -55,6 +57,13 @@ const attachingExisting = computed(
 const primaryLabel = computed(() => {
   if (attachingExisting.value) return "Attach existing gloss";
   return props.mode === "create" ? "Create" : "Save";
+});
+
+const lockedLanguageLabel = computed(() => {
+  if (!props.lockedLanguage) return null;
+  const lang = LANGUAGES[props.lockedLanguage];
+  if (!lang) return props.lockedLanguage;
+  return lang.emoji ? `${lang.emoji} ${lang.name} (${props.lockedLanguage})` : `${lang.name} (${props.lockedLanguage})`;
 });
 
 watch(
@@ -91,13 +100,26 @@ watch(
   { deep: true }
 );
 
+watch(
+  () => props.lockedLanguage,
+  (next) => {
+    if (next) {
+      form.language = next;
+    }
+  }
+);
+
 function resetForm() {
-  form.language = props.initialGloss?.language ?? props.defaults?.language ?? "eng";
+  form.language = resolveLanguage();
   form.content = props.initialGloss?.content ?? props.defaults?.content ?? "";
   form.isParaphrased = props.initialGloss?.isParaphrased ?? false;
   form.transcriptions = props.initialGloss?.transcriptions ? [...props.initialGloss.transcriptions] : [];
   form.notes = props.initialGloss?.notes ? cloneNotes(props.initialGloss.notes) : [];
   clearMatches();
+}
+
+function resolveLanguage(): LanguageCode {
+  return (props.lockedLanguage ?? props.initialGloss?.language ?? props.defaults?.language ?? "eng") as LanguageCode;
 }
 
 function clearMatches() {
@@ -256,7 +278,8 @@ function selectSuggestion(gloss: GlossDTO) {
         <form @submit.prevent="handleSubmit" class="space-y-4">
           <fieldset class="fieldset">
             <label for="gloss-language" class="label">Language</label>
-            <LanguageSelect id="gloss-language" v-model="form.language" />
+            <p v-if="lockedLanguageLabel" class="py-2">{{ lockedLanguageLabel }}</p>
+            <LanguageSelect v-else id="gloss-language" v-model="form.language" />
           </fieldset>
 
           <fieldset class="fieldset">
@@ -273,12 +296,7 @@ function selectSuggestion(gloss: GlossDTO) {
               />
               <span v-if="form.isParaphrased && !attachingExisting" aria-hidden="true" class="text-lg text-light">]</span>
             </div>
-            <p v-if="isCheckingMatches" class="text-xs text-light mt-1">Checking for existing glosses…</p>
-            <p v-else-if="existingGloss" class="text-xs text-success mt-1">
-              Existing gloss found. Confirm to attach it.
-            </p>
             <div class="text-xs mt-2 space-y-1">
-              <p v-if="suggestions.length" class="text-light">Similar glosses:</p>
               <div
                 class="flex gap-2 overflow-x-auto py-2 min-h-[2.5rem]"
                 :class="{ 'opacity-0 pointer-events-none': !suggestions.length }"
@@ -287,10 +305,10 @@ function selectSuggestion(gloss: GlossDTO) {
                   v-for="suggestion in suggestions"
                   :key="suggestion.id"
                   type="button"
-                  class="btn btn-ghost btn-xs whitespace-nowrap"
+                  class="btn btn-xs whitespace-nowrap"
                   @click="selectSuggestion(suggestion)"
                 >
-                  Use “{{ suggestion.content }}” ({{ suggestion.language }})
+                  {{ suggestion.content }}
                 </button>
               </div>
             </div>

@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import { ChevronRight, ChevronDown, Edit, ExternalLink } from "lucide-vue-next";
-import { LANGUAGES, type SituationDTO, type LocalizedString } from "@sbl/shared";
+import { LANGUAGES, type SituationDTO, type LocalizedString, type LanguageCode } from "@sbl/shared";
 import { useToast } from "../../dumb/toasts/index";
 import ChallengeItemExpression from "./ChallengeItemExpression.vue";
 import ChallengeItemUnderstanding from "./ChallengeItemUnderstanding.vue";
@@ -11,6 +11,7 @@ import ModalAddExpressionChallenge from "../../features/challenge-expression-add
 import ModalAddUnderstandingChallenge from "../../features/challenge-understanding-add/ModalAddUnderstandingChallenge.vue";
 import ModalEditSituation from "../../features/situation-edit/ModalEditSituation.vue";
 import { useModalEditSituation } from "../../features/situation-edit/index";
+import LanguageSelect from "../../dumb/LanguageSelect.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -24,6 +25,7 @@ const showExpressionModal = ref(false);
 const showUnderstandingModal = ref(false);
 const expressionSectionOpen = ref(true);
 const understandingSectionOpen = ref(true);
+const selectedNativeLanguage = ref<LanguageCode>("eng");
 
 const { open: openEditModal } = useModalEditSituation();
 
@@ -165,12 +167,7 @@ async function handleUpdateSituation(identifier: string, descriptions: Localized
                 </p>
               </div>
             </div>
-            <button
-              @click="handleEditSituation"
-              class="btn btn-ghost btn-sm"
-              type="button"
-              title="Edit situation"
-            >
+            <button @click="handleEditSituation" class="btn btn-ghost btn-sm" type="button" title="Edit situation">
               <Edit :size="16" />
             </button>
           </div>
@@ -178,19 +175,12 @@ async function handleUpdateSituation(identifier: string, descriptions: Localized
           <!-- Image Display -->
           <div v-if="situation.imageLink" class="mt-4 space-y-2">
             <div class="relative">
-              <img
-                :src="situation.imageLink"
-                :alt="`Image for ${situation.identifier}`"
+              <img :src="situation.imageLink" :alt="`Image for ${situation.identifier}`"
                 class="w-full max-w-md rounded-lg shadow-sm"
-                @error="($event.target as HTMLImageElement).style.display = 'none'"
-              />
+                @error="($event.target as HTMLImageElement).style.display = 'none'" />
             </div>
-            <a
-              :href="situation.imageLink"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-            >
+            <a :href="situation.imageLink" target="_blank" rel="noopener noreferrer"
+              class="inline-flex items-center gap-1 text-sm text-primary hover:underline">
               <ExternalLink :size="14" />
               {{ situation.imageLink }}
             </a>
@@ -198,10 +188,19 @@ async function handleUpdateSituation(identifier: string, descriptions: Localized
         </div>
       </div>
 
+      <!-- Native Language Filter -->
+      <div class="flex flex-wrap items-end gap-4">
+        <fieldset class="fieldset max-w-xs">
+          <label for="native-language" class="label">Native Language</label>
+          <LanguageSelect id="native-language" v-model="selectedNativeLanguage" />
+        </fieldset>
+      </div>
+
       <!-- Challenges of Expression -->
       <div class="card shadow">
         <div class="card-body">
-          <details :open="expressionSectionOpen" @toggle="expressionSectionOpen = ($event.target as HTMLDetailsElement).open">
+          <details :open="expressionSectionOpen"
+            @toggle="expressionSectionOpen = ($event.target as HTMLDetailsElement).open">
             <summary class="flex items-center gap-2 cursor-pointer list-none">
               <ChevronRight :size="20" v-if="!expressionSectionOpen" />
               <ChevronDown :size="20" v-else />
@@ -213,22 +212,13 @@ async function handleUpdateSituation(identifier: string, descriptions: Localized
                 No expression challenges yet
               </div>
               <div v-else class="space-y-1">
-                <ChallengeItemExpression
-                  v-for="(challenge, index) in situation.challengesOfExpression"
-                  :key="index"
-                  :challenge="challenge"
-                  :situation-id="situationId"
-                  :index="index"
-                  @deleted="handleChallengeDeleted"
-                  @updated="handleChallengeUpdated"
-                />
+                <ChallengeItemExpression v-for="(challenge, index) in situation.challengesOfExpression" :key="index"
+                  :challenge="challenge" :situation-id="situationId" :index="index"
+                  :native-language="selectedNativeLanguage" @deleted="handleChallengeDeleted"
+                  @updated="handleChallengeUpdated" />
               </div>
               <div>
-                <button
-                  @click="openExpressionModal"
-                  class="btn btn-outline btn-sm justify-start"
-                  type="button"
-                >
+                <button @click="openExpressionModal" class="btn btn-outline btn-sm justify-start" type="button">
                   Add expression challenge
                 </button>
               </div>
@@ -240,7 +230,8 @@ async function handleUpdateSituation(identifier: string, descriptions: Localized
       <!-- Challenges of Understanding Text -->
       <div class="card shadow">
         <div class="card-body">
-          <details :open="understandingSectionOpen" @toggle="understandingSectionOpen = ($event.target as HTMLDetailsElement).open">
+          <details :open="understandingSectionOpen"
+            @toggle="understandingSectionOpen = ($event.target as HTMLDetailsElement).open">
             <summary class="flex items-center gap-2 cursor-pointer list-none">
               <ChevronRight :size="20" v-if="!understandingSectionOpen" />
               <ChevronDown :size="20" v-else />
@@ -248,26 +239,18 @@ async function handleUpdateSituation(identifier: string, descriptions: Localized
             </summary>
 
             <div class="mt-4 space-y-3">
-              <div v-if="situation.challengesOfUnderstandingText.length === 0" class="text-center py-4 text-base-content/70">
+              <div v-if="situation.challengesOfUnderstandingText.length === 0"
+                class="text-center py-4 text-base-content/70">
                 No understanding challenges yet
               </div>
               <div v-else class="space-y-1">
-                <ChallengeItemUnderstanding
-                  v-for="(challenge, index) in situation.challengesOfUnderstandingText"
-                  :key="index"
-                  :challenge="challenge"
-                  :situation-id="situationId"
-                  :index="index"
-                  @deleted="handleChallengeDeleted"
-                  @updated="handleChallengeUpdated"
-                />
+                <ChallengeItemUnderstanding v-for="(challenge, index) in situation.challengesOfUnderstandingText"
+                  :key="index" :challenge="challenge" :situation-id="situationId" :index="index"
+                  :target-language="situation.targetLanguage" :native-language="selectedNativeLanguage"
+                  @deleted="handleChallengeDeleted" @updated="handleChallengeUpdated" />
               </div>
               <div>
-                <button
-                  @click="openUnderstandingModal"
-                  class="btn btn-outline btn-sm justify-start"
-                  type="button"
-                >
+                <button @click="openUnderstandingModal" class="btn btn-outline btn-sm justify-start" type="button">
                   Add understanding challenge
                 </button>
               </div>
@@ -277,21 +260,11 @@ async function handleUpdateSituation(identifier: string, descriptions: Localized
       </div>
     </div>
 
-    <ModalAddExpressionChallenge
-      v-if="situation"
-      :show="showExpressionModal"
-      :situation-id="situationId"
-      @close="showExpressionModal = false"
-      @added="handleChallengeAdded"
-    />
+    <ModalAddExpressionChallenge v-if="situation" :show="showExpressionModal" :situation-id="situationId"
+      @close="showExpressionModal = false" @added="handleChallengeAdded" />
 
-    <ModalAddUnderstandingChallenge
-      v-if="situation"
-      :show="showUnderstandingModal"
-      :situation-id="situationId"
-      @close="showUnderstandingModal = false"
-      @added="handleChallengeAdded"
-    />
+    <ModalAddUnderstandingChallenge v-if="situation" :show="showUnderstandingModal" :situation-id="situationId"
+      @close="showUnderstandingModal = false" @added="handleChallengeAdded" />
 
     <ModalEditSituation @update="handleUpdateSituation" />
   </section>

@@ -26,6 +26,11 @@
 - Each challenge row (`ChallengeItemExpression` / `ChallengeItemUnderstanding`) is a `details` tree. Summaries show a single line (polite file-tree aesthetic) with inline icon controls, keeping the vertical rhythm predictable.
 - The gloss section within a challenge delegates to `GlossTreeNode`. This component understands three use cases simultaneously: (1) inspect nested contains/translations, (2) attach brand new glosses via modal, and (3) edit/detach existing ones without leaving the tree.
 
+### Language Controls
+- The situation view now exposes a single native-language dropdown (default `eng`). Expression challenges only render glosses whose `language` matches this selection so editors can focus on one learner language at a time.
+- Gloss additions no longer expose arbitrary language pickers: expression glosses always use the selected native language, while understanding glosses (and their contained children) always use the situation’s target language.
+- When expanding gloss translations inside understanding challenges we filter the list to the selected native language, and adding a translation automatically locks the modal to that language. This keeps translation pairs predictable and removes accidental cross-language attachments.
+
 ### Modal Responsibilities
 - `GlossModal` is intentionally minimal: language/content plus the handful of gloss metadata we care about (`isParaphrased`, transcriptions, notes). It always posts to `/glosses` on “create” and returns the saved DTO. The caller decides what to do with the resulting `id` (e.g., attach it to a challenge or to another gloss relation).
 - We only render brackets around the content input when `isParaphrased` is true. This enforces a visual convention that paraphrases are treated as paraphrases everywhere (both in lists and modals), so authors don’t forget the flag’s meaning.

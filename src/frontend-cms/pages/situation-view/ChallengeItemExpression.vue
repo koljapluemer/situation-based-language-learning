@@ -8,6 +8,7 @@ import type {
   GlossDTO,
   LocalizedString,
   SituationDTO,
+  LanguageCode,
 } from "@sbl/shared";
 import GlossModal from "../../features/gloss-manage/GlossModal.vue";
 import GlossTreeNode from "../../features/gloss-tree/GlossTreeNode.vue";
@@ -17,6 +18,7 @@ const props = defineProps<{
   challenge: ChallengeOfExpression;
   situationId: string;
   index: number;
+  nativeLanguage: LanguageCode;
 }>();
 
 const emit = defineEmits<{
@@ -35,6 +37,10 @@ const englishPrompt = computed(() => getEnglishPrompt(props.challenge));
 const editedPrompt = ref(englishPrompt.value);
 const showGlossModal = ref(false);
 const isGlossPending = ref(false);
+const nativeLanguage = computed(() => props.nativeLanguage);
+const filteredGlosses = computed(() =>
+  props.challenge.glosses.filter((gloss) => gloss.language === nativeLanguage.value)
+);
 
 watch(
   () => props.challenge.prompts,
@@ -305,14 +311,15 @@ function updateEnglishPrompt(prompts: LocalizedString[], content: string): Local
         </div>
 
         <div class="space-y-2">
-          <div v-if="!challenge.glosses.length" class="text-sm text-light italic">
-            No glosses attached yet.
+          <div v-if="!filteredGlosses.length" class="text-sm text-light italic">
+            No glosses in this language.
           </div>
           <div v-else class="space-y-2">
             <GlossTreeNode
-              v-for="gloss in challenge.glosses"
+              v-for="gloss in filteredGlosses"
               :key="gloss.id"
               :gloss="gloss"
+              :lock-language="true"
               detachable
               @detach="detachGloss(gloss.id)"
               @changed="emit('updated')"
@@ -334,7 +341,8 @@ function updateEnglishPrompt(prompts: LocalizedString[], content: string): Local
   <GlossModal
     :show="showGlossModal"
     mode="create"
-    :defaults="{ language: ENGLISH_LANGUAGE }"
+    :defaults="{ language: nativeLanguage }"
+    :locked-language="nativeLanguage"
     @close="closeGlossModal"
     @saved="handleGlossSaved"
   />

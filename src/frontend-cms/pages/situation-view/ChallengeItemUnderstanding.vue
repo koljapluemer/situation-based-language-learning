@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import { Pencil, Trash2, X, Check, ChevronRight, ChevronDown } from "lucide-vue-next";
 import type {
@@ -19,6 +19,8 @@ const props = defineProps<{
   challenge: ChallengeOfUnderstandingText;
   situationId: string;
   index: number;
+  targetLanguage: LanguageCode;
+  nativeLanguage: LanguageCode;
 }>();
 
 const emit = defineEmits<{
@@ -36,6 +38,8 @@ const editedText = ref(props.challenge.text);
 const editedLanguage = ref<LanguageCode>(props.challenge.language);
 const showGlossModal = ref(false);
 const isGlossPending = ref(false);
+const targetLanguage = computed(() => props.targetLanguage);
+const nativeLanguage = computed(() => props.nativeLanguage);
 
 watch(
   () => props.challenge,
@@ -311,6 +315,8 @@ function toUnderstandingWritePayload(
               v-for="gloss in challenge.glosses"
               :key="gloss.id"
               :gloss="gloss"
+              :lock-language="true"
+              :translation-language="nativeLanguage"
               detachable
               @detach="detachGloss(gloss.id)"
               @changed="emit('updated')"
@@ -332,7 +338,8 @@ function toUnderstandingWritePayload(
   <GlossModal
     :show="showGlossModal"
     mode="create"
-    :defaults="{ language: editedLanguage }"
+    :defaults="{ language: targetLanguage }"
+    :locked-language="targetLanguage"
     @close="closeGlossModal"
     @saved="handleGlossSaved"
   />

@@ -5,13 +5,15 @@ import { computed, reactive, ref, watch } from "vue";
 import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-vue-next";
 import { useToast } from "../../dumb/toasts";
 import GlossModal from "../gloss-manage/GlossModal.vue";
-import type { GlossDTO, GlossReference } from "@sbl/shared";
+import type { GlossDTO, GlossReference, LanguageCode } from "@sbl/shared";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3333";
 const props = defineProps<{
   gloss: GlossDTO;
   depth?: number;
   detachable?: boolean;
+  translationLanguage?: LanguageCode;
+  lockLanguage?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -30,6 +32,13 @@ const localGloss = ref<GlossDTO>(props.gloss);
 const isNodeOpen = ref(false);
 const containsOpen = ref(false);
 const translationsOpen = ref(false);
+const filteredTranslations = computed(() => {
+  const list = localGloss.value?.translations ?? [];
+  if (!props.translationLanguage) {
+    return list;
+  }
+  return list.filter((ref) => ref.language === props.translationLanguage);
+});
 
 const childGlosses = reactive<Record<string, GlossDTO>>({});
 
@@ -37,6 +46,11 @@ const showModal = ref(false);
 const modalMode = ref<"create" | "edit">("create");
 const modalInitial = ref<GlossDTO | null>(null);
 const relationContext = ref<RelationType | null>(null);
+const modalDefaultLanguage = ref<LanguageCode | undefined>(undefined);
+const modalLockedLanguage = ref<LanguageCode | undefined>(undefined);
+const modalDefaults = computed(() =>
+  modalDefaultLanguage.value ? { language: modalDefaultLanguage.value } : undefined
+);
 
 watch(
   () => props.gloss,
@@ -70,6 +84,16 @@ watch(translationsOpen, (open) => {
   }
 });
 
+function setModalLanguages(language?: LanguageCode | null, lock?: boolean) {
+  modalDefaultLanguage.value = language ?? undefined;
+  modalLockedLanguage.value = lock && language ? language : undefined;
+}
+
+function clearModalLanguages() {
+  modalDefaultLanguage.value = undefined;
+  modalLockedLanguage.value = undefined;
+}
+
 function formatContent(gloss: GlossDTO | null) {
   if (!gloss) return "—";
   return gloss.isParaphrased ? `[${gloss.content}]` : gloss.content;
@@ -88,6 +112,7 @@ function openEditSelf() {
   modalMode.value = "edit";
   relationContext.value = null;
   modalInitial.value = localGloss.value;
+  setModalLanguages(localGloss.value.language, props.lockLanguage);
   showModal.value = true;
 }
 
@@ -117,6 +142,11 @@ function startAddRelation(type: RelationType) {
   relationContext.value = type;
   modalMode.value = "create";
   modalInitial.value = null;
+  if (type === "contains") {
+    setModalLanguages(localGloss.value?.language, props.lockLanguage);
+  } else {
+    setModalLanguages(props.translationLanguage, true);
+  }
   showModal.value = true;
 }
 
@@ -126,6 +156,7 @@ async function openEditRelation(reference: GlossReference) {
     modalMode.value = "edit";
     relationContext.value = null;
     modalInitial.value = gloss;
+    setModalLanguages(gloss.language, props.lockLanguage);
     showModal.value = true;
   } catch (error) {
     toast.error(error instanceof Error ? error.message : "Failed to load gloss");
@@ -165,6 +196,7 @@ async function handleModalSaved(gloss: GlossDTO) {
     } finally {
       relationContext.value = null;
       modalInitial.value = null;
+      clearModalLanguages();
     }
     return;
   }
@@ -177,6 +209,7 @@ async function handleModalSaved(gloss: GlossDTO) {
   emit("changed");
   relationContext.value = null;
   modalInitial.value = null;
+  clearModalLanguages();
 }
 
 async function refreshSelf() {
@@ -239,9 +272,10 @@ async function updateRelations(type: RelationType, ids: string[]) {
 }
 
 function relationEmpty(type: RelationType) {
-  const list =
-    type === "contains" ? localGloss.value?.contains ?? [] : localGloss.value?.translations ?? [];
-  return list.length === 0;
+  if (type === "contains") {
+    return (localGloss.value?.contains?.length ?? 0) === 0;
+  }
+  return filteredTranslations.value.length === 0;
 }
 
 const hasContains = computed(() => (localGloss.value?.contains?.length ?? 0) > 0);
@@ -255,6 +289,7 @@ function handleModalClose() {
   showModal.value = false;
   relationContext.value = null;
   modalInitial.value = null;
+  clearModalLanguages();
 }
 
 async function fetchReferenceSummary(glossId: string) {
@@ -363,7 +398,7 @@ async function fetchReferenceSummary(glossId: string) {
             </div>
             <div v-else class="space-y-3">
               <div
-                v-for="translation in localGloss?.translations ?? []"
+                v-for="translation in filteredTranslations"
                 :key="translation.id"
                 class="flex items-center gap-2 py-1 px-2 rounded hover:bg-base-200"
               >
@@ -403,7 +438,8 @@ async function fetchReferenceSummary(glossId: string) {
     :show="showModal"
     :mode="modalMode"
     :initial-gloss="modalInitial ?? undefined"
-    :defaults="{ language: localGloss?.language }"
+    :defaults="modalDefaults"
+    :locked-language="modalLockedLanguage"
     @close="handleModalClose"
     @saved="handleModalSaved"
   />
