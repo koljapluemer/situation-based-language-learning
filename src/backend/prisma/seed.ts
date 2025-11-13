@@ -3,7 +3,8 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
-  const hello = await prisma.gloss.upsert({
+  // Create Spanish glosses for understanding challenges (target language)
+  const hola = await prisma.gloss.upsert({
     where: {
       language_content: {
         language: "spa",
@@ -26,7 +27,7 @@ async function main() {
     },
   });
 
-  const question = await prisma.gloss.upsert({
+  const comoEstas = await prisma.gloss.upsert({
     where: {
       language_content: {
         language: "spa",
@@ -40,11 +41,50 @@ async function main() {
       isParaphrased: false,
       transcriptions: ["ˈkomo esˈtas"],
       contains: {
-        connect: [{ id: hello.id }],
+        connect: [{ id: hola.id }],
       },
     },
   });
 
+  // Create English glosses for expression challenges (native language prompts)
+  const greetFriend = await prisma.gloss.upsert({
+    where: {
+      language_content: {
+        language: "eng",
+        content: "Greet a friend",
+      },
+    },
+    update: {},
+    create: {
+      language: "eng",
+      content: "Greet a friend",
+      isParaphrased: false,
+      notes: [
+        {
+          noteType: "usage",
+          content: "A casual, friendly greeting",
+          showBeforeSolution: true,
+        },
+      ],
+    },
+  });
+
+  const askHowAreYou = await prisma.gloss.upsert({
+    where: {
+      language_content: {
+        language: "eng",
+        content: "Ask how someone is doing",
+      },
+    },
+    update: {},
+    create: {
+      language: "eng",
+      content: "Ask how someone is doing",
+      isParaphrased: false,
+    },
+  });
+
+  // Create situation with direct gloss connections
   await prisma.situation.upsert({
     where: { identifier: "greeting-basic" },
     update: {},
@@ -57,28 +97,15 @@ async function main() {
       ],
       targetLanguage: "spa",
       challengesOfExpression: {
-        create: [
-          {
-            identifier: "saluda-a-un-amigo",
-            prompts: [
-              { language: "eng", content: "Greet a friend" },
-              { language: "spa", content: "Saluda a un amigo" },
-            ],
-            glosses: { connect: [{ id: hello.id }, { id: question.id }] },
-          },
-        ],
+        connect: [{ id: greetFriend.id }, { id: askHowAreYou.id }],
       },
-      challengesOfUnderstanding: {
-        create: [
-          {
-            text: "Hola, ¿cómo estás?",
-            language: "spa",
-            glosses: { connect: [{ id: hello.id }, { id: question.id }] },
-          },
-        ],
+      challengesOfUnderstandingText: {
+        connect: [{ id: hola.id }, { id: comoEstas.id }],
       },
     },
   });
+
+  console.log("Seed data created successfully");
 }
 
 main()

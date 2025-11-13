@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { getSituation, resolveGlossesForChallenge } from '../../entities/situation';
-import type { ChallengeOfUnderstandingTextEntity } from '../../entities/situation/types';
+import { getSituation } from '../../entities/situation';
+import { getGloss } from '../../entities/gloss';
 import type { GlossEntity } from '../../entities/gloss/types';
 import { generateGlossRevealTasks } from '../../tasks/task-understanding-text-gloss-reveal/generate';
 import type { Task, TaskResult } from '../../tasks/types';
@@ -14,8 +14,8 @@ const router = useRouter();
 const situationId = route.params.situationId as string;
 
 // Data loading state
-const challenge = ref<ChallengeOfUnderstandingTextEntity | null>(null);
 const resolvedGlosses = ref<GlossEntity[]>([]);
+const targetLanguage = ref<string>('');
 const situationIdentifier = ref<string>('');
 const isLoading = ref(true);
 const error = ref<string | null>(null);
@@ -44,35 +44,34 @@ onMounted(async () => {
     }
 
     situationIdentifier.value = situation.identifier;
+    targetLanguage.value = situation.targetLanguage;
 
-    // Check if situation has understanding text challenges
-    if (!situation.challengesOfUnderstandingText || situation.challengesOfUnderstandingText.length === 0) {
-      error.value = 'This situation has no understanding text challenges.';
+    // Check if situation has understanding text glosses
+    if (!situation.challengesOfUnderstandingTextIds || situation.challengesOfUnderstandingTextIds.length === 0) {
+      error.value = 'This situation has no understanding text glosses.';
       return;
     }
 
-    // Select a random challenge
-    const challenges = situation.challengesOfUnderstandingText;
-    const randomIndex = Math.floor(Math.random() * challenges.length);
-    challenge.value = challenges[randomIndex];
-
-    // Resolve glosses
-    resolvedGlosses.value = await resolveGlossesForChallenge(challenge.value.glossIds);
+    // Resolve all glosses for understanding challenges
+    const glossIds = situation.challengesOfUnderstandingTextIds;
+    const glossPromises = glossIds.map(id => getGloss(id));
+    const glossResults = await Promise.all(glossPromises);
+    resolvedGlosses.value = glossResults.filter((g): g is GlossEntity => g !== undefined);
 
     // Generate tasks from glosses
     if (resolvedGlosses.value.length === 0) {
-      error.value = 'This challenge has no glosses to practice.';
+      error.value = 'This situation has no glosses to practice.';
       return;
     }
 
     generatedTasks.value = generateGlossRevealTasks(
       resolvedGlosses.value,
-      challenge.value.language
+      targetLanguage.value
     );
 
   } catch (err) {
-    console.error('Error loading challenge:', err);
-    error.value = err instanceof Error ? err.message : 'Failed to load challenge';
+    console.error('Error loading glosses:', err);
+    error.value = err instanceof Error ? err.message : 'Failed to load glosses';
   } finally {
     isLoading.value = false;
   }
@@ -101,7 +100,7 @@ function restartPractice() {
   <!-- Loading State -->
   <div v-if="isLoading" class="flex flex-col items-center justify-center h-screen gap-4">
     <span class="loading loading-spinner loading-lg" aria-hidden="true"></span>
-    <p class="text-lg">Loading challenge...</p>
+    <p class="text-lg">Loading glosses...</p>
   </div>
 
   <!-- Error State -->

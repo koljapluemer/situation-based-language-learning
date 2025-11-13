@@ -25,30 +25,6 @@ CREATE TABLE "Gloss" (
 );
 
 -- CreateTable
-CREATE TABLE "ChallengeOfExpression" (
-    "id" TEXT NOT NULL,
-    "identifier" TEXT NOT NULL,
-    "prompts" JSONB NOT NULL,
-    "situationId" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "ChallengeOfExpression_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "ChallengeOfUnderstandingText" (
-    "id" TEXT NOT NULL,
-    "text" TEXT NOT NULL,
-    "language" TEXT NOT NULL,
-    "situationId" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "ChallengeOfUnderstandingText_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "_GlossContains" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL,
@@ -97,26 +73,23 @@ CREATE TABLE "_GlossDifferentiations" (
 );
 
 -- CreateTable
-CREATE TABLE "_ExpressionGlosses" (
+CREATE TABLE "_ExpressionChallenges" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL,
 
-    CONSTRAINT "_ExpressionGlosses_AB_pkey" PRIMARY KEY ("A","B")
+    CONSTRAINT "_ExpressionChallenges_AB_pkey" PRIMARY KEY ("A","B")
 );
 
 -- CreateTable
-CREATE TABLE "_UnderstandingGlosses" (
+CREATE TABLE "_UnderstandingChallenges" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL,
 
-    CONSTRAINT "_UnderstandingGlosses_AB_pkey" PRIMARY KEY ("A","B")
+    CONSTRAINT "_UnderstandingChallenges_AB_pkey" PRIMARY KEY ("A","B")
 );
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Gloss_language_content_key" ON "Gloss"("language", "content");
-
--- CreateIndex
-CREATE UNIQUE INDEX "ChallengeOfExpression_situationId_identifier_key" ON "ChallengeOfExpression"("situationId", "identifier");
 
 -- CreateIndex
 CREATE INDEX "_GlossContains_B_index" ON "_GlossContains"("B");
@@ -137,16 +110,10 @@ CREATE INDEX "_GlossClarifiesUsage_B_index" ON "_GlossClarifiesUsage"("B");
 CREATE INDEX "_GlossDifferentiations_B_index" ON "_GlossDifferentiations"("B");
 
 -- CreateIndex
-CREATE INDEX "_ExpressionGlosses_B_index" ON "_ExpressionGlosses"("B");
+CREATE INDEX "_ExpressionChallenges_B_index" ON "_ExpressionChallenges"("B");
 
 -- CreateIndex
-CREATE INDEX "_UnderstandingGlosses_B_index" ON "_UnderstandingGlosses"("B");
-
--- AddForeignKey
-ALTER TABLE "ChallengeOfExpression" ADD CONSTRAINT "ChallengeOfExpression_situationId_fkey" FOREIGN KEY ("situationId") REFERENCES "Situation"("identifier") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ChallengeOfUnderstandingText" ADD CONSTRAINT "ChallengeOfUnderstandingText_situationId_fkey" FOREIGN KEY ("situationId") REFERENCES "Situation"("identifier") ON DELETE CASCADE ON UPDATE CASCADE;
+CREATE INDEX "_UnderstandingChallenges_B_index" ON "_UnderstandingChallenges"("B");
 
 -- AddForeignKey
 ALTER TABLE "_GlossContains" ADD CONSTRAINT "_GlossContains_A_fkey" FOREIGN KEY ("A") REFERENCES "Gloss"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -185,13 +152,13 @@ ALTER TABLE "_GlossDifferentiations" ADD CONSTRAINT "_GlossDifferentiations_A_fk
 ALTER TABLE "_GlossDifferentiations" ADD CONSTRAINT "_GlossDifferentiations_B_fkey" FOREIGN KEY ("B") REFERENCES "Gloss"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "_ExpressionGlosses" ADD CONSTRAINT "_ExpressionGlosses_A_fkey" FOREIGN KEY ("A") REFERENCES "ChallengeOfExpression"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "_ExpressionChallenges" ADD CONSTRAINT "_ExpressionChallenges_A_fkey" FOREIGN KEY ("A") REFERENCES "Gloss"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "_ExpressionGlosses" ADD CONSTRAINT "_ExpressionGlosses_B_fkey" FOREIGN KEY ("B") REFERENCES "Gloss"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "_ExpressionChallenges" ADD CONSTRAINT "_ExpressionChallenges_B_fkey" FOREIGN KEY ("B") REFERENCES "Situation"("identifier") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "_UnderstandingGlosses" ADD CONSTRAINT "_UnderstandingGlosses_A_fkey" FOREIGN KEY ("A") REFERENCES "ChallengeOfUnderstandingText"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "_UnderstandingChallenges" ADD CONSTRAINT "_UnderstandingChallenges_A_fkey" FOREIGN KEY ("A") REFERENCES "Gloss"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "_UnderstandingGlosses" ADD CONSTRAINT "_UnderstandingGlosses_B_fkey" FOREIGN KEY ("B") REFERENCES "Gloss"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "_UnderstandingChallenges" ADD CONSTRAINT "_UnderstandingChallenges_B_fkey" FOREIGN KEY ("B") REFERENCES "Situation"("identifier") ON DELETE CASCADE ON UPDATE CASCADE;

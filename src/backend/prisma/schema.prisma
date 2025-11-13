@@ -18,8 +18,8 @@ model Situation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  challengesOfExpression    ChallengeOfExpression[]
-  challengesOfUnderstanding ChallengeOfUnderstandingText[]
+  challengesOfExpression       Gloss[] @relation("ExpressionChallenges")
+  challengesOfUnderstandingText Gloss[] @relation("UnderstandingChallenges")
 }
 
 model Gloss {
@@ -49,34 +49,8 @@ model Gloss {
   toBeDifferentiatedFrom Gloss[] @relation("GlossDifferentiations")
   differentiationOf      Gloss[] @relation("GlossDifferentiations")
 
-  expressionChallenges    ChallengeOfExpression[]      @relation("ExpressionGlosses")
-  understandingChallenges ChallengeOfUnderstandingText[] @relation("UnderstandingGlosses")
+  expressionSituations      Situation[] @relation("ExpressionChallenges")
+  understandingSituations   Situation[] @relation("UnderstandingChallenges")
 
   @@unique([language, content])
-}
-
-model ChallengeOfExpression {
-  id          String   @id @default(cuid())
-  identifier  String
-  prompts     Json
-  situationId String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  situation Situation @relation(fields: [situationId], references: [identifier], onDelete: Cascade)
-  glosses   Gloss[]   @relation("ExpressionGlosses")
-
-  @@unique([situationId, identifier])
-}
-
-model ChallengeOfUnderstandingText {
-  id          String   @id @default(cuid())
-  text        String
-  language    String   // Validated against LANGUAGES in @sbl/shared
-  situationId String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  situation Situation @relation(fields: [situationId], references: [identifier], onDelete: Cascade)
-  glosses   Gloss[]   @relation("UnderstandingGlosses")
 }

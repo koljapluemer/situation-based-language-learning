@@ -1,17 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useQuery, useQueryClient } from "@tanstack/vue-query";
-import { ChevronRight, ChevronDown, Edit, ExternalLink } from "lucide-vue-next";
-import { LANGUAGES, type SituationDTO, type LocalizedString, type LanguageCode } from "@sbl/shared";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/vue-query";
+import { ChevronRight, ChevronDown, Edit, ExternalLink, Trash2, Plus } from "lucide-vue-next";
+import { LANGUAGES, type SituationDTO, type LocalizedString, type LanguageCode, type GlossDTO } from "@sbl/shared";
 import { useToast } from "../../dumb/toasts/index";
-import ChallengeItemExpression from "./ChallengeItemExpression.vue";
-import ChallengeItemUnderstanding from "./ChallengeItemUnderstanding.vue";
-import ModalAddExpressionChallenge from "../../features/challenge-expression-add/ModalAddExpressionChallenge.vue";
-import ModalAddUnderstandingChallenge from "../../features/challenge-understanding-add/ModalAddUnderstandingChallenge.vue";
 import ModalEditSituation from "../../features/situation-edit/ModalEditSituation.vue";
 import { useModalEditSituation } from "../../features/situation-edit/index";
 import LanguageSelect from "../../dumb/LanguageSelect.vue";
+import GlossModal from "../../features/gloss-manage/GlossModal.vue";
+import GlossTreeNode from "../../features/gloss-tree/GlossTreeNode.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -21,8 +19,8 @@ const queryClient = useQueryClient();
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3333";
 const situationId = route.params.id as string;
 
-const showExpressionModal = ref(false);
-const showUnderstandingModal = ref(false);
+const showGlossModalExpression = ref(false);
+const showGlossModalUnderstanding = ref(false);
 const expressionSectionOpen = ref(true);
 const understandingSectionOpen = ref(true);
 const selectedNativeLanguage = ref<LanguageCode>("eng");
@@ -37,7 +35,7 @@ const { data: situation, isLoading, error } = useQuery({
   queryFn: async ({ queryKey }) => {
     const [, id, nativeLanguage] = queryKey as [string, string, LanguageCode?];
     const languageParam = nativeLanguage ?? "eng";
-    const response = await fetch(`${API_BASE_URL}/situations/${id}?language=${languageParam}`);
+    const response = await fetch(`${API_BASE_URL}/situations/${id}?nativeLanguages=${languageParam}`);
     if (!response.ok) {
       if (response.status === 404) {
         throw new Error("Situation not found");
@@ -63,28 +61,87 @@ function goBack() {
   router.push({ name: "situations-list" });
 }
 
-function openExpressionModal() {
-  showExpressionModal.value = true;
+function openGlossModalExpression() {
+  showGlossModalExpression.value = true;
 }
 
-function openUnderstandingModal() {
-  showUnderstandingModal.value = true;
+function openGlossModalUnderstanding() {
+  showGlossModalUnderstanding.value = true;
 }
 
-async function handleChallengeAdded() {
-  // Invalidate and refetch the situation
-  await queryClient.invalidateQueries({ queryKey: ["situation", situationId] });
-  toast.success("Challenge added successfully");
+async function handleGlossAdded(gloss: GlossDTO, type: "expression" | "understanding") {
+  if (!situation.value) return;
+
+  try {
+    const currentIds = type === "expression"
+      ? situation.value.challengesOfExpression.map(g => g.id)
+      : situation.value.challengesOfUnderstandingText.map(g => g.id);
+
+    // Add gloss ID if not already present
+    if (currentIds.includes(gloss.id)) {
+      toast.info("This gloss is already attached");
+      return;
+    }
+
+    const newIds = [...currentIds, gloss.id];
+    const field = type === "expression"
+      ? "challengesOfExpressionIds"
+      : "challengesOfUnderstandingTextIds";
+
+    const response = await fetch(`${API_BASE_URL}/situations/${situationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [field]: newIds }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to add gloss: ${response.status}`);
+    }
+
+    await queryClient.invalidateQueries({ queryKey: ["situation", situationId] });
+    toast.success("Gloss added successfully");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    toast.error(`Failed to add gloss: ${message}`);
+  }
 }
 
-async function handleChallengeDeleted() {
-  await queryClient.invalidateQueries({ queryKey: ["situation", situationId] });
-  toast.success("Challenge deleted successfully");
-}
+const removeGlossMutation = useMutation({
+  mutationFn: async ({ glossId, type }: { glossId: string; type: "expression" | "understanding" }) => {
+    if (!situation.value) throw new Error("Situation not found");
 
-async function handleChallengeUpdated() {
-  await queryClient.invalidateQueries({ queryKey: ["situation", situationId] });
-  toast.success("Challenge updated successfully");
+    const currentIds = type === "expression"
+      ? situation.value.challengesOfExpression.map(g => g.id)
+      : situation.value.challengesOfUnderstandingText.map(g => g.id);
+
+    const newIds = currentIds.filter(id => id !== glossId);
+    const field = type === "expression"
+      ? "challengesOfExpressionIds"
+      : "challengesOfUnderstandingTextIds";
+
+    const response = await fetch(`${API_BASE_URL}/situations/${situationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [field]: newIds }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to remove gloss: ${response.status}`);
+    }
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["situation", situationId] });
+    toast.success("Gloss removed successfully");
+  },
+  onError: (error) => {
+    toast.error(error instanceof Error ? error.message : "Failed to remove gloss");
+  },
+});
+
+function handleRemoveGloss(glossId: string, type: "expression" | "understanding") {
+  if (confirm("Remove this gloss from the situation?")) {
+    removeGlossMutation.mutate({ glossId, type });
+  }
 }
 
 function handleEditSituation() {
@@ -124,6 +181,10 @@ async function handleUpdateSituation(identifier: string, descriptions: Localized
     const message = error instanceof Error ? error.message : "Unknown error";
     toast.error(`Failed to update situation: ${message}`);
   }
+}
+
+function handleGlossChanged() {
+  queryClient.invalidateQueries({ queryKey: ["situation", situationId] });
 }
 </script>
 
@@ -212,19 +273,43 @@ async function handleUpdateSituation(identifier: string, descriptions: Localized
             </summary>
 
             <div class="mt-4 space-y-3">
+              <div class="text-sm text-base-content/70 mb-2">
+                Glosses in native language ({{ selectedNativeLanguage }}) that prompt learners to express themselves in {{ situation.targetLanguage }}
+              </div>
+
               <div v-if="situation.challengesOfExpression.length === 0" class="text-center py-4 text-base-content/70">
-                No expression challenges yet
+                No expression glosses yet
               </div>
-              <div v-else class="space-y-1">
-                <ChallengeItemExpression v-for="(challenge, index) in situation.challengesOfExpression" :key="index"
-                  :challenge="challenge" :situation-id="situationId" :index="index"
-                  :native-language="selectedNativeLanguage" :target-language="situation.targetLanguage"
-                  @deleted="handleChallengeDeleted"
-                  @updated="handleChallengeUpdated" />
+              <div v-else class="space-y-3">
+                <div v-for="gloss in situation.challengesOfExpression" :key="gloss.id"
+                  class="card bg-base-100 border border-base-300">
+                  <div class="card-body p-3">
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="flex-1">
+                        <GlossTreeNode
+                          :gloss="gloss"
+                          :enforce-language="selectedNativeLanguage"
+                          :translation-language="situation.targetLanguage"
+                          @changed="handleGlossChanged"
+                        />
+                      </div>
+                      <button
+                        @click="handleRemoveGloss(gloss.id, 'expression')"
+                        class="btn btn-ghost btn-sm btn-square"
+                        type="button"
+                        title="Remove gloss"
+                      >
+                        <Trash2 :size="16" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
+
               <div>
-                <button @click="openExpressionModal" class="btn btn-outline btn-sm justify-start" type="button">
-                  Add expression challenge
+                <button @click="openGlossModalExpression" class="btn btn-outline btn-sm gap-2" type="button">
+                  <Plus :size="16" />
+                  Add expression gloss
                 </button>
               </div>
             </div>
@@ -244,19 +329,44 @@ async function handleUpdateSituation(identifier: string, descriptions: Localized
             </summary>
 
             <div class="mt-4 space-y-3">
+              <div class="text-sm text-base-content/70 mb-2">
+                Glosses in target language ({{ situation.targetLanguage }}) that learners need to understand
+              </div>
+
               <div v-if="situation.challengesOfUnderstandingText.length === 0"
                 class="text-center py-4 text-base-content/70">
-                No understanding challenges yet
+                No understanding glosses yet
               </div>
-              <div v-else class="space-y-1">
-                <ChallengeItemUnderstanding v-for="(challenge, index) in situation.challengesOfUnderstandingText"
-                  :key="index" :challenge="challenge" :situation-id="situationId" :index="index"
-                  :target-language="situation.targetLanguage" :native-language="selectedNativeLanguage"
-                  @deleted="handleChallengeDeleted" @updated="handleChallengeUpdated" />
+              <div v-else class="space-y-3">
+                <div v-for="gloss in situation.challengesOfUnderstandingText" :key="gloss.id"
+                  class="card bg-base-100 border border-base-300">
+                  <div class="card-body p-3">
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="flex-1">
+                        <GlossTreeNode
+                          :gloss="gloss"
+                          :enforce-language="situation.targetLanguage"
+                          :translation-language="selectedNativeLanguage"
+                          @changed="handleGlossChanged"
+                        />
+                      </div>
+                      <button
+                        @click="handleRemoveGloss(gloss.id, 'understanding')"
+                        class="btn btn-ghost btn-sm btn-square"
+                        type="button"
+                        title="Remove gloss"
+                      >
+                        <Trash2 :size="16" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
+
               <div>
-                <button @click="openUnderstandingModal" class="btn btn-outline btn-sm justify-start" type="button">
-                  Add understanding challenge
+                <button @click="openGlossModalUnderstanding" class="btn btn-outline btn-sm gap-2" type="button">
+                  <Plus :size="16" />
+                  Add understanding gloss
                 </button>
               </div>
             </div>
@@ -265,11 +375,23 @@ async function handleUpdateSituation(identifier: string, descriptions: Localized
       </div>
     </div>
 
-    <ModalAddExpressionChallenge v-if="situation" :show="showExpressionModal" :situation-id="situationId"
-      @close="showExpressionModal = false" @added="handleChallengeAdded" />
+    <GlossModal
+      v-if="situation"
+      :show="showGlossModalExpression"
+      mode="create"
+      :locked-language="selectedNativeLanguage"
+      @close="showGlossModalExpression = false"
+      @saved="(gloss) => handleGlossAdded(gloss, 'expression')"
+    />
 
-    <ModalAddUnderstandingChallenge v-if="situation" :show="showUnderstandingModal" :situation-id="situationId"
-      @close="showUnderstandingModal = false" @added="handleChallengeAdded" />
+    <GlossModal
+      v-if="situation"
+      :show="showGlossModalUnderstanding"
+      mode="create"
+      :locked-language="situation.targetLanguage"
+      @close="showGlossModalUnderstanding = false"
+      @saved="(gloss) => handleGlossAdded(gloss, 'understanding')"
+    />
 
     <ModalEditSituation @update="handleUpdateSituation" />
   </section>

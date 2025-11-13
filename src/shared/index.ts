@@ -4,5 +4,3 @@ export * from "./Note";
 export * from "./dto/GlossDTO";
 export * from "./dto/SituationDTO";
 export * from "./dto/SituationSummaryDTO";
-export * from "./ChallengeOfExpression";
-export * from "./ChallengeOfUnderstandingText";

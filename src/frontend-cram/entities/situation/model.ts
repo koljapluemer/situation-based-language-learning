@@ -1,10 +1,6 @@
 import type { SituationDTO, SituationSummaryDTO, LanguageCode } from '@sbl/shared';
 import { db } from '../database/db';
-import type {
-  SituationEntity,
-  ChallengeOfExpressionEntity,
-  ChallengeOfUnderstandingTextEntity,
-} from './types';
+import type { SituationEntity } from './types';
 import { getGloss } from '../gloss/model';
 
 /**
@@ -16,20 +12,8 @@ export function fromDTO(dto: SituationDTO): SituationEntity {
     descriptions: dto.descriptions,
     imageLink: dto.imageLink,
     targetLanguage: dto.targetLanguage,
-    challengesOfExpression: dto.challengesOfExpression.map(
-      (challenge): ChallengeOfExpressionEntity => ({
-        identifier: challenge.identifier,
-        prompts: challenge.prompts,
-        glossIds: challenge.glosses.map(g => g.id),
-      })
-    ),
-    challengesOfUnderstandingText: dto.challengesOfUnderstandingText.map(
-      (challenge): ChallengeOfUnderstandingTextEntity => ({
-        text: challenge.text,
-        language: challenge.language,
-        glossIds: challenge.glosses.map(g => g.id),
-      })
-    ),
+    challengesOfExpressionIds: dto.challengesOfExpression.map(g => g.id),
+    challengesOfUnderstandingTextIds: dto.challengesOfUnderstandingText.map(g => g.id),
     lastSyncedAt: new Date(),
     updatedAt: new Date(),
   };
@@ -39,7 +23,7 @@ export function fromDTO(dto: SituationDTO): SituationEntity {
  * Transform SituationSummaryDTO to a partial SituationEntity
  * (without challenges, for list views)
  */
-export function fromSummaryDTO(dto: SituationSummaryDTO): Omit<SituationEntity, 'challengesOfExpression' | 'challengesOfUnderstandingText'> {
+export function fromSummaryDTO(dto: SituationSummaryDTO): Omit<SituationEntity, 'challengesOfExpressionIds' | 'challengesOfUnderstandingTextIds'> {
   return {
     identifier: dto.identifier,
     descriptions: dto.descriptions,
@@ -105,8 +89,8 @@ export async function upsertSituationSummary(dto: SituationSummaryDTO): Promise<
     // Create new situation with empty challenges
     await db.situations.add({
       ...partial,
-      challengesOfExpression: [],
-      challengesOfUnderstandingText: [],
+      challengesOfExpressionIds: [],
+      challengesOfUnderstandingTextIds: [],
     });
   }
 }

@@ -1,5 +1,4 @@
-import { ChallengeOfExpression } from "../ChallengeOfExpression"
-import { ChallengeOfUnderstandingText } from "../ChallengeOfUnderstandingText"
+import { GlossDTO } from "./GlossDTO"
 import { LocalizedString } from "../LocalizedString"
 import { LanguageCode } from "../Language"
 
@@ -9,6 +8,6 @@ export interface SituationDTO {
     imageLink?: string
     targetLanguage: LanguageCode
 
-    challengesOfUnderstandingText: ChallengeOfUnderstandingText[]
-    challengesOfExpression: ChallengeOfExpression[]
+    challengesOfUnderstandingText: GlossDTO[]
+    challengesOfExpression: GlossDTO[]
 }
