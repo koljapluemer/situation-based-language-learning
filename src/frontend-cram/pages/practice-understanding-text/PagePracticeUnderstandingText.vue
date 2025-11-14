@@ -285,18 +285,21 @@ onMounted(async () => {
   <div v-else-if="!isComplete && currentTask" class="h-screen">
     <GlossTryToRememberRender
       v-if="currentTask.taskType === 'gloss-try-to-remember'"
+      :key="currentTask.id"
       :task="currentTask"
       @finished="handleTaskFinished"
       @exit="handleTaskExit"
     />
     <GlossRevealRender
       v-else-if="currentTask.taskType === 'gloss-reveal'"
+      :key="currentTask.id"
       :task="currentTask"
       @finished="handleTaskFinished"
       @exit="handleTaskExit"
     />
     <GuessWhatGlossMeansRender
       v-else-if="currentTask.taskType === 'guess-what-gloss-means'"
+      :key="currentTask.id"
       :task="currentTask"
       @finished="handleTaskFinished"
       @exit="handleTaskExit"
