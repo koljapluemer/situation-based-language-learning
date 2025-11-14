@@ -2,7 +2,7 @@
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/vue-query";
-import { ChevronRight, ChevronDown, Edit, ExternalLink, Trash2, Plus } from "lucide-vue-next";
+import { ChevronRight, ChevronDown, Edit, ExternalLink, Trash2, Plus, Sparkles } from "lucide-vue-next";
 import { LANGUAGES, type SituationDTO, type LocalizedString, type LanguageCode, type GlossDTO } from "@sbl/shared";
 import { useToast } from "../../dumb/toasts/index";
 import ModalEditSituation from "../../features/situation-edit/ModalEditSituation.vue";
@@ -10,6 +10,7 @@ import { useModalEditSituation } from "../../features/situation-edit/index";
 import LanguageSelect from "../../dumb/LanguageSelect.vue";
 import GlossModal from "../../features/gloss-manage/GlossModal.vue";
 import GlossTreeNode from "../../features/gloss-tree/GlossTreeNode.vue";
+import ModalGenerateUnderstandingChallenges from "../../features/ai-challenges/ModalGenerateUnderstandingChallenges.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -21,6 +22,7 @@ const situationId = route.params.id as string;
 
 const showGlossModalExpression = ref(false);
 const showGlossModalUnderstanding = ref(false);
+const showAIGenerateModal = ref(false);
 const expressionSectionOpen = ref(true);
 const understandingSectionOpen = ref(true);
 const selectedNativeLanguage = ref<LanguageCode>("eng");
@@ -67,6 +69,16 @@ function openGlossModalExpression() {
 
 function openGlossModalUnderstanding() {
   showGlossModalUnderstanding.value = true;
+}
+
+function openAIGenerateModal() {
+  showAIGenerateModal.value = true;
+}
+
+function handleAIGenerated() {
+  queryClient.invalidateQueries({ queryKey: ["situation", situationId] });
+  showAIGenerateModal.value = false;
+  toast.success("AI-generated challenges added successfully");
 }
 
 async function handleGlossAdded(gloss: GlossDTO, type: "expression" | "understanding") {
@@ -363,10 +375,14 @@ function handleGlossChanged() {
                 </div>
               </div>
 
-              <div>
+              <div class="flex gap-2">
                 <button @click="openGlossModalUnderstanding" class="btn btn-outline btn-sm gap-2" type="button">
                   <Plus :size="16" />
                   Add understanding gloss
+                </button>
+                <button @click="openAIGenerateModal" class="btn btn-primary btn-sm gap-2" type="button">
+                  <Sparkles :size="16" />
+                  Generate with AI
                 </button>
               </div>
             </div>
@@ -391,6 +407,15 @@ function handleGlossChanged() {
       :locked-language="situation.targetLanguage"
       @close="showGlossModalUnderstanding = false"
       @saved="(gloss) => handleGlossAdded(gloss, 'understanding')"
+    />
+
+    <ModalGenerateUnderstandingChallenges
+      v-if="situation"
+      :show="showAIGenerateModal"
+      :situation="situation"
+      :native-language="selectedNativeLanguage"
+      @close="showAIGenerateModal = false"
+      @saved="handleAIGenerated"
     />
 
     <ModalEditSituation @update="handleUpdateSituation" />

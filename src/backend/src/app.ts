@@ -4,6 +4,7 @@ import { env } from "./env";
 import { registerHealthRoutes } from "./routes/health";
 import { registerGlossRoutes } from "./routes/glosses";
 import { registerSituationRoutes } from "./routes/situations";
+import { registerAIChallengeRoutes } from "./routes/ai-challenges";
 import { HttpError } from "./utils/http-error";
 import { prisma } from "./lib/prisma";
 import { ZodError } from "zod";
@@ -46,6 +47,7 @@ export function buildApp() {
   registerHealthRoutes(app);
   registerGlossRoutes(app);
   registerSituationRoutes(app);
+  registerAIChallengeRoutes(app);
 
   return app;
 }
