@@ -91,10 +91,11 @@ export function registerAIChallengeRoutes(app: FastifyInstance) {
       const situation = await situationService.findById(id, {});
       const targetLanguage = situation.targetLanguage as LanguageCode;
 
-      // Create glosses with recursive contains
-      const createdGlossIds = await glossCreationHelper.createMultipleGlosses(
+      // Create glosses with recursive contains and translations
+      const createdGlossIds = await glossCreationHelper.createMultipleGlossesWithTranslations(
         payload.selectedGlosses,
-        targetLanguage
+        targetLanguage,
+        payload.nativeLanguage
       );
 
       // Get existing understanding challenge IDs

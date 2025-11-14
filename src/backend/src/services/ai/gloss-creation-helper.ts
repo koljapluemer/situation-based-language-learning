@@ -364,6 +364,72 @@ export class GlossCreationHelper {
     return glossIds;
   }
 
+  /**
+   * Ensure translations exist for an existing gloss
+   *
+   * Creates missing translation glosses in the provided native language and links
+   * them to the target gloss.
+   *
+   * @param glossId - The existing gloss ID to attach translations to
+   * @param nativeLanguage - Language code for translation glosses
+   * @param translations - Array of translation payloads
+   */
+  async ensureTranslationsForGloss(
+    glossId: string,
+    nativeLanguage: LanguageCode,
+    translations: GlossPayload[]
+  ): Promise<{
+    addedTranslationIds: string[];
+    totalTranslationIds: string[];
+  }> {
+    if (translations.length === 0) {
+      const gloss = await this.glossService.findById(glossId);
+      const existingTranslationIds = this.extractIds(gloss.translations);
+      return {
+        addedTranslationIds: [],
+        totalTranslationIds: existingTranslationIds,
+      };
+    }
+
+    const targetGloss = await this.glossService.findById(glossId);
+    const existingTranslationIds = this.extractIds(targetGloss.translations);
+
+    const ensuredTranslationIds: string[] = [];
+    for (const translation of translations) {
+      const translationId = await this.createGlossWithContains(
+        {
+          content: translation.content,
+          isParaphrased: translation.isParaphrased,
+          transcriptions: translation.transcriptions,
+          notes: translation.notes,
+          contains: translation.contains,
+        },
+        nativeLanguage
+      );
+      ensuredTranslationIds.push(translationId);
+    }
+
+    const additions = ensuredTranslationIds.filter(
+      id => !existingTranslationIds.includes(id)
+    );
+
+    if (additions.length > 0) {
+      const totalTranslationIds = [...existingTranslationIds, ...additions];
+      await this.glossService.update(glossId, {
+        translationIds: totalTranslationIds,
+      });
+      return {
+        addedTranslationIds: additions,
+        totalTranslationIds,
+      };
+    }
+
+    return {
+      addedTranslationIds: [],
+      totalTranslationIds: existingTranslationIds,
+    };
+  }
+
   private extractIds(items?: Array<{ id: string }>): string[] {
     return items?.map(item => item.id) ?? [];
   }

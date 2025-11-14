@@ -6,11 +6,13 @@ import { AI_CONFIG } from "../../../config/ai-config";
 import { env } from "../../../env";
 import { GlossService } from "../../gloss-service";
 import { SituationService } from "../../situation-service";
+import { GlossCreationHelper } from "../../ai/gloss-creation-helper";
 import { createSearchExistingGlossesTool } from "./tools/search-existing-glosses.tool";
 import { createGetRelatedGlossesTool } from "./tools/get-related-glosses.tool";
 import { createCheckGlossExistsTool } from "./tools/check-gloss-exists.tool";
 import { createAnalyzeSituationTool } from "./tools/analyze-situation.tool";
 import { createValidateGlossStructureTool } from "./tools/validate-gloss-structure.tool";
+import { createEnsureTranslationsTool } from "./tools/ensure-translations.tool";
 
 /**
  * Context for agentic generation
@@ -58,6 +60,7 @@ export class AgenticGenerator {
   private readonly agentRunner: ReturnType<ChatOpenAI["bindTools"]>;
   private readonly glossService: GlossService;
   private readonly situationService: SituationService;
+  private readonly glossCreationHelper: GlossCreationHelper;
   private readonly tools: Map<string, StructuredToolInterface>;
 
   constructor(
@@ -74,6 +77,7 @@ export class AgenticGenerator {
     // Initialize services
     this.glossService = glossService || new GlossService();
     this.situationService = situationService || new SituationService();
+    this.glossCreationHelper = new GlossCreationHelper(this.glossService);
 
     // Create tools
     const tools = [
@@ -82,6 +86,7 @@ export class AgenticGenerator {
       createCheckGlossExistsTool(this.glossService),
       createAnalyzeSituationTool(this.situationService),
       createValidateGlossStructureTool(this.glossService),
+      createEnsureTranslationsTool(this.glossService, this.glossCreationHelper),
     ];
     this.tools = new Map(tools.map(tool => [tool.name, tool]));
 
@@ -255,8 +260,9 @@ Your task is to generate comprehensive understanding text challenges for a langu
 3. Generate both direct vocabulary (isParaphrased: false) and descriptive glosses (isParaphrased: true)
 4. Split sentences into constituent parts using 'contains' (usually 1 level, deeper for complex structures)
 5. Use getRelatedGlosses to build rich relationships
-6. Aim for comprehensive coverage: basic vocabulary, idioms, variations, related concepts
-7. No strict limit on count - generate until the situation is well-covered (typically 10-20 glosses)
+6. Every gloss must have at least one translation in ${context.nativeLanguage}. Include translations in your final JSON. When you decide to rely on an existing gloss that lacks translations, call ensureGlossTranslations and provide the translations you want to add.
+7. Aim for comprehensive coverage: basic vocabulary, idioms, variations, related concepts
+8. No strict limit on count - generate until the situation is well-covered (typically 10-20 glosses)
 
 **Output Format**:
 When done, return a JSON object:
@@ -265,6 +271,7 @@ When done, return a JSON object:
     {
       "content": "string (the text in target language)",
       "isParaphrased": boolean,
+      "translation": "string (translation in ${context.nativeLanguage})",
       "transcriptions": ["phonetic"],
       "notes": [{ "noteType": "usage", "content": "...", "showBeforeSolution": false }],
       "contains": [
