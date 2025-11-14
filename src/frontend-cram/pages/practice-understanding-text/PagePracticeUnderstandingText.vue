@@ -2,11 +2,15 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { getSituation } from '../../entities/situation';
-import { getGloss } from '../../entities/gloss';
+import { getGloss, getGlossesByIds, getRecallProbability } from '../../entities/gloss';
 import type { GlossEntity } from '../../entities/gloss/types';
-import { generateGlossRevealTasks } from '../../tasks/task-understanding-text-gloss-reveal/generate';
-import type { Task, TaskResult } from '../../tasks/types';
-import TaskRenderer from '../../tasks/task-understanding-text-gloss-reveal/Render.vue';
+import type { Task } from '../../tasks/types';
+import { generateGlossTryToRemember } from '../../tasks/task-gloss-try-to-remember/generate';
+import { generateGlossReveal } from '../../tasks/task-gloss-reveal/generate';
+import { generateGuessWhatGlossMeans } from '../../tasks/task-guess-what-gloss-means/generate';
+import GlossTryToRememberRender from '../../tasks/task-gloss-try-to-remember/Render.vue';
+import GlossRevealRender from '../../tasks/task-gloss-reveal/Render.vue';
+import GuessWhatGlossMeansRender from '../../tasks/task-guess-what-gloss-means/Render.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -14,21 +18,187 @@ const router = useRouter();
 const situationId = route.params.situationId as string;
 
 // Data loading state
-const resolvedGlosses = ref<GlossEntity[]>([]);
+const allGlosses = ref<Map<string, GlossEntity>>(new Map());
+const challengeGlossIds = ref<string[]>([]);
 const targetLanguage = ref<string>('');
 const situationIdentifier = ref<string>('');
 const isLoading = ref(true);
 const error = ref<string | null>(null);
 
 // Task orchestration state
-const generatedTasks = ref<Task[]>([]);
-const currentTaskIndex = ref(0);
-const taskResults = ref<TaskResult[]>([]);
+const currentTask = ref<Task | null>(null);
+const lastPracticedGlossId = ref<string | null>(null);
+const isComplete = ref(false);
 
-// Computed properties
-const currentTask = computed(() => generatedTasks.value[currentTaskIndex.value]);
-const isComplete = computed(() => currentTaskIndex.value >= generatedTasks.value.length);
-const totalTasks = computed(() => generatedTasks.value.length);
+// Computed: Check if all challenge glosses are ready (recall > 0.95)
+const allGlossesReady = computed(() => {
+  // If no challenge glosses, not ready
+  if (challengeGlossIds.value.length === 0) return false;
+
+  for (const glossId of challengeGlossIds.value) {
+    const gloss = allGlosses.value.get(glossId);
+    if (!gloss) return false; // Missing gloss means not ready
+    if (getRecallProbability(gloss) < 0.95) {
+      return false;
+    }
+  }
+  return true;
+});
+
+/**
+ * Recursively collect all gloss IDs including contained glosses
+ */
+async function collectAllGlossIds(glossIds: string[]): Promise<Set<string>> {
+  const collected = new Set<string>();
+  const toProcess = [...glossIds];
+
+  while (toProcess.length > 0) {
+    const id = toProcess.pop()!;
+    if (collected.has(id)) continue;
+
+    collected.add(id);
+
+    const gloss = await getGloss(id);
+    if (gloss && gloss.containsIds.length > 0) {
+      toProcess.push(...gloss.containsIds);
+    }
+  }
+
+  return collected;
+}
+
+/**
+ * Check if all dependencies (contains) of a gloss have recall >= 0.8
+ */
+function areDependenciesMet(gloss: GlossEntity): boolean {
+  if (gloss.containsIds.length === 0) return true;
+
+  for (const depId of gloss.containsIds) {
+    const depGloss = allGlosses.value.get(depId);
+    if (!depGloss) return false;
+    if (getRecallProbability(depGloss) < 0.8) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Select next gloss to practice
+ */
+function selectNextGloss(): GlossEntity | null {
+  const eligibleGlosses: GlossEntity[] = [];
+
+  // Find all glosses that need practice and have dependencies met
+  for (const gloss of allGlosses.value.values()) {
+    // Skip if this was the last practiced gloss
+    if (gloss.id === lastPracticedGlossId.value) continue;
+
+    // Skip if recall is already high enough
+    if (getRecallProbability(gloss) >= 0.95) continue;
+
+    // Check if dependencies are met
+    if (!areDependenciesMet(gloss)) continue;
+
+    eligibleGlosses.push(gloss);
+  }
+
+  if (eligibleGlosses.length === 0) return null;
+
+  // Randomize selection
+  const randomIndex = Math.floor(Math.random() * eligibleGlosses.length);
+  return eligibleGlosses[randomIndex];
+}
+
+/**
+ * Generate next task based on current state
+ */
+async function generateNextTask() {
+  console.log('[generateNextTask] Starting', {
+    allGlossesReady: allGlossesReady.value,
+    challengeGlossCount: challengeGlossIds.value.length,
+    totalGlossCount: allGlosses.value.size
+  });
+
+  // If all glosses are ready, present final challenge
+  if (allGlossesReady.value) {
+    console.log('[generateNextTask] All glosses ready, presenting final challenge');
+    // Pick a random challenge gloss for the final test
+    const randomIndex = Math.floor(Math.random() * challengeGlossIds.value.length);
+    const challengeGlossId = challengeGlossIds.value[randomIndex];
+    const gloss = allGlosses.value.get(challengeGlossId);
+
+    if (gloss) {
+      currentTask.value = generateGuessWhatGlossMeans(gloss);
+      return;
+    }
+  }
+
+  // Select next gloss to practice
+  const nextGloss = selectNextGloss();
+  console.log('[generateNextTask] Selected next gloss:', nextGloss?.id, nextGloss?.content);
+
+  if (!nextGloss) {
+    // No more glosses to practice but not all are ready - should not happen
+    // but handle gracefully
+    console.log('[generateNextTask] No eligible glosses found, marking complete');
+    isComplete.value = true;
+    return;
+  }
+
+  // Determine which task type to use
+  if (!nextGloss.progressEbisu) {
+    // First time seeing this gloss
+    console.log('[generateNextTask] First time - try to remember');
+    currentTask.value = generateGlossTryToRemember(nextGloss);
+  } else {
+    // Already seen, use reveal task
+    console.log('[generateNextTask] Already seen - reveal task');
+    currentTask.value = generateGlossReveal(nextGloss);
+  }
+
+  lastPracticedGlossId.value = nextGloss.id!;
+}
+
+/**
+ * Handle task completion
+ */
+async function handleTaskFinished() {
+  // Reload the gloss that was just practiced to get updated progress
+  if (lastPracticedGlossId.value) {
+    const updatedGloss = await getGloss(lastPracticedGlossId.value);
+    if (updatedGloss) {
+      allGlosses.value.set(updatedGloss.id!, updatedGloss);
+    }
+  }
+
+  // Check if we just completed the final challenge
+  if (currentTask.value?.taskType === 'guess-what-gloss-means' && allGlossesReady.value) {
+    isComplete.value = true;
+    return;
+  }
+
+  // Generate next task
+  await generateNextTask();
+}
+
+/**
+ * Handle exit from task
+ */
+function handleTaskExit() {
+  router.push({ name: 'situations' });
+}
+
+function goBack() {
+  router.push({ name: 'situations' });
+}
+
+function restartPractice() {
+  isComplete.value = false;
+  lastPracticedGlossId.value = null;
+  generateNextTask();
+}
 
 onMounted(async () => {
   try {
@@ -37,6 +207,8 @@ onMounted(async () => {
 
     // Fetch situation from Dexie
     const situation = await getSituation(situationId);
+
+    console.log('[onMounted] Loaded situation:', JSON.stringify(situation, null, 2));
 
     if (!situation) {
       error.value = `Situation "${situationId}" not found. Please download it first.`;
@@ -52,22 +224,33 @@ onMounted(async () => {
       return;
     }
 
-    // Resolve all glosses for understanding challenges
-    const glossIds = situation.challengesOfUnderstandingTextIds;
-    const glossPromises = glossIds.map(id => getGloss(id));
-    const glossResults = await Promise.all(glossPromises);
-    resolvedGlosses.value = glossResults.filter((g): g is GlossEntity => g !== undefined);
+    challengeGlossIds.value = situation.challengesOfUnderstandingTextIds;
+    console.log('[onMounted] Challenge gloss IDs:', challengeGlossIds.value);
 
-    // Generate tasks from glosses
-    if (resolvedGlosses.value.length === 0) {
+    // Recursively collect all glosses including dependencies
+    const allGlossIdsSet = await collectAllGlossIds(challengeGlossIds.value);
+    const allGlossIdArray = Array.from(allGlossIdsSet);
+    console.log('[onMounted] All gloss IDs (including dependencies):', allGlossIdArray);
+
+    // Load all glosses
+    const loadedGlosses = await getGlossesByIds(allGlossIdArray);
+    console.log('[onMounted] Loaded glosses count:', loadedGlosses.length);
+
+    // Store in map for easy lookup
+    for (const gloss of loadedGlosses) {
+      if (gloss.id) {
+        allGlosses.value.set(gloss.id, gloss);
+        console.log('[onMounted] Gloss:', gloss.id, gloss.content, 'progressEbisu:', gloss.progressEbisu);
+      }
+    }
+
+    if (allGlosses.value.size === 0) {
       error.value = 'This situation has no glosses to practice.';
       return;
     }
 
-    generatedTasks.value = generateGlossRevealTasks(
-      resolvedGlosses.value,
-      targetLanguage.value
-    );
+    // Generate first task
+    await generateNextTask();
 
   } catch (err) {
     console.error('Error loading glosses:', err);
@@ -76,24 +259,6 @@ onMounted(async () => {
     isLoading.value = false;
   }
 });
-
-function handleTaskFinished(result: TaskResult) {
-  // Store the result
-  taskResults.value.push(result);
-
-  // Move to next task
-  currentTaskIndex.value++;
-}
-
-function goBack() {
-  router.push({ name: 'situations' });
-}
-
-function restartPractice() {
-  // Reset to first task
-  currentTaskIndex.value = 0;
-  taskResults.value = [];
-}
 </script>
 
 <template>
@@ -114,48 +279,34 @@ function restartPractice() {
   </div>
 
   <!-- Task Renderer -->
-  <div v-else-if="!isComplete && currentTask">
-    <TaskRenderer
+  <div v-else-if="!isComplete && currentTask" class="h-screen">
+    <GlossTryToRememberRender
+      v-if="currentTask.taskType === 'gloss-try-to-remember'"
       :task="currentTask"
       @finished="handleTaskFinished"
+      @exit="handleTaskExit"
+    />
+    <GlossRevealRender
+      v-else-if="currentTask.taskType === 'gloss-reveal'"
+      :task="currentTask"
+      @finished="handleTaskFinished"
+      @exit="handleTaskExit"
+    />
+    <GuessWhatGlossMeansRender
+      v-else-if="currentTask.taskType === 'guess-what-gloss-means'"
+      :task="currentTask"
+      @finished="handleTaskFinished"
+      @exit="handleTaskExit"
     />
   </div>
 
   <!-- Completion Screen -->
   <div v-else-if="isComplete" class="flex flex-col items-center justify-center h-screen gap-6 p-4">
     <div class="text-center space-y-4">
-      <h1 class="text-4xl font-bold">Practice Complete! 🎉</h1>
+      <h1>Practice Complete!</h1>
       <p class="text-xl">
-        You completed {{ totalTasks }} task{{ totalTasks !== 1 ? 's' : '' }}
+        You completed practice for {{ situationIdentifier }}
       </p>
-      <div class="text-base-content/70">
-        Situation: <span class="font-semibold">{{ situationIdentifier }}</span>
-      </div>
-
-      <!-- Task results summary -->
-      <div class="card shadow-lg max-w-md mx-auto">
-        <div class="card-body">
-          <h3 class="card-title text-lg">Ratings</h3>
-          <div class="flex flex-col gap-2">
-            <div class="flex justify-between">
-              <span>Again (1):</span>
-              <span class="badge badge-error">{{ taskResults.filter(r => r.rating === 1).length }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span>Hard (2):</span>
-              <span class="badge badge-warning">{{ taskResults.filter(r => r.rating === 2).length }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span>Good (3):</span>
-              <span class="badge badge-info">{{ taskResults.filter(r => r.rating === 3).length }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span>Easy (4):</span>
-              <span class="badge badge-success">{{ taskResults.filter(r => r.rating === 4).length }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- Action buttons -->

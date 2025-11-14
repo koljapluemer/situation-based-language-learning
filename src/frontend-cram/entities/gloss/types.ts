@@ -1,6 +1,12 @@
 import type { LanguageCode, Note } from '@sbl/shared';
 import type { DexieCloudEntity, SyncMetadata } from '../database/types';
 
+
+export interface ProgressEbisu {
+  model: [number, number, number] // [a, b, t
+  lastReviewed: Date
+}
+
 /**
  * Gloss entity for local storage
  *
@@ -27,4 +33,7 @@ export interface GlossEntity extends DexieCloudEntity, SyncMetadata {
   translationIds: string[];
   clarifiesUsageIds: string[];
   toBeDifferentiatedFromIds: string[];
+
+  // per-user-progress
+  progressEbisu?: ProgressEbisu
 }

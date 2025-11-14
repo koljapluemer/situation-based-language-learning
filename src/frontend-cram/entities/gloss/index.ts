@@ -9,4 +9,7 @@ export {
   getGlossesByLanguage,
   deleteGloss,
   clearAllGlosses,
+  updateGlossProgress,
+  getRecallProbability,
+  getDueGlosses,
 } from './model';

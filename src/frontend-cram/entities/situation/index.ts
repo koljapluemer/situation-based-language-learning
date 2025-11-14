@@ -1,7 +1,5 @@
 export type {
   SituationEntity,
-  ChallengeOfExpressionEntity,
-  ChallengeOfUnderstandingTextEntity,
 } from './types';
 export {
   fromDTO,

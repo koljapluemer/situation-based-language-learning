@@ -1,6 +1,7 @@
 import type { GlossDTO, LanguageCode } from '@sbl/shared';
 import { db } from '../database/db';
 import type { GlossEntity } from './types';
+import * as ebisu from 'ebisu-js';
 
 /**
  * Transform GlossDTO from API to GlossEntity for local storage
@@ -11,14 +12,14 @@ export function fromDTO(dto: GlossDTO): GlossEntity {
     language: dto.language,
     content: dto.content,
     isParaphrased: dto.isParaphrased,
-    transcriptions: dto.transcriptions,
-    notes: dto.notes,
-    containsIds: dto.contains.map(ref => ref.id),
-    nearSynonymIds: dto.nearSynonyms.map(ref => ref.id),
-    nearHomophoneIds: dto.nearHomophones.map(ref => ref.id),
-    translationIds: dto.translations.map(ref => ref.id),
-    clarifiesUsageIds: dto.clarifiesUsage.map(ref => ref.id),
-    toBeDifferentiatedFromIds: dto.toBeDifferentiatedFrom.map(ref => ref.id),
+    transcriptions: dto.transcriptions || [],
+    notes: dto.notes || [],
+    containsIds: (dto.contains || []).map(ref => ref.id),
+    nearSynonymIds: (dto.nearSynonyms || []).map(ref => ref.id),
+    nearHomophoneIds: (dto.nearHomophones || []).map(ref => ref.id),
+    translationIds: (dto.translations || []).map(ref => ref.id),
+    clarifiesUsageIds: (dto.clarifiesUsage || []).map(ref => ref.id),
+    toBeDifferentiatedFromIds: (dto.toBeDifferentiatedFrom || []).map(ref => ref.id),
     lastSyncedAt: new Date(),
     updatedAt: new Date(),
   };
@@ -108,4 +109,52 @@ export async function deleteGloss(id: string): Promise<void> {
  */
 export async function clearAllGlosses(): Promise<void> {
   await db.glosses.clear();
+}
+
+/**
+ * Update Ebisu progress for a gloss
+ */
+export async function updateGlossProgress(
+  glossId: string,
+  model: [number, number, number],
+  lastReviewed: Date
+): Promise<void> {
+  await db.glosses.update(glossId, {
+    progressEbisu: {
+      model,
+      lastReviewed
+    }
+  });
+}
+
+/**
+ * Get recall probability for a gloss using Ebisu
+ * Returns 0 if no progress exists yet
+ */
+export function getRecallProbability(gloss: GlossEntity): number {
+  if (!gloss.progressEbisu) {
+    return 0;
+  }
+
+  const { model, lastReviewed } = gloss.progressEbisu;
+  const hoursSinceReview = (Date.now() - lastReviewed.getTime()) / (1000 * 60 * 60);
+
+  return ebisu.predictRecall(model, hoursSinceReview, true);
+}
+
+/**
+ * Get glosses that need practice (recall probability below threshold)
+ * If minRecall not provided, returns all glosses
+ */
+export async function getDueGlosses(
+  glossIds: string[],
+  minRecall?: number
+): Promise<GlossEntity[]> {
+  const glosses = await db.glosses.where('id').anyOf(glossIds).toArray();
+
+  if (minRecall === undefined) {
+    return glosses;
+  }
+
+  return glosses.filter(gloss => getRecallProbability(gloss) < minRecall);
 }

@@ -22,10 +22,60 @@ export async function downloadSituationSummaries(
 }
 
 /**
+ * Recursively collect all glosses from a GlossDTO tree
+ * Includes: the gloss itself, all contains (recursive), all translations (depth 1)
+ */
+function collectAllGlossesRecursive(
+  gloss: any,
+  collected: Map<string, any>
+): void {
+  // Avoid cycles
+  if (collected.has(gloss.id)) return;
+
+  // Add this gloss
+  collected.set(gloss.id, gloss);
+
+  // Recursively collect contains glosses
+  if (gloss.contains && Array.isArray(gloss.contains)) {
+    gloss.contains.forEach((containedGloss: any) => {
+      collectAllGlossesRecursive(containedGloss, collected);
+    });
+  }
+
+  // Collect translations (depth 1, not recursive)
+  if (gloss.translations && Array.isArray(gloss.translations)) {
+    gloss.translations.forEach((translation: any) => {
+      if (!collected.has(translation.id)) {
+        collected.set(translation.id, translation);
+      }
+    });
+  }
+
+  // Also collect other relations at depth 1 if present
+  const otherRelations = [
+    'nearSynonyms',
+    'nearHomophones',
+    'clarifiesUsage',
+    'toBeDifferentiatedFrom'
+  ];
+
+  otherRelations.forEach(relation => {
+    if (gloss[relation] && Array.isArray(gloss[relation])) {
+      gloss[relation].forEach((relatedGloss: any) => {
+        if (!collected.has(relatedGloss.id)) {
+          collected.set(relatedGloss.id, relatedGloss);
+        }
+      });
+    }
+  });
+}
+
+/**
  * Download full situation details including glosses
  * Performs smart merge:
  * - Situations merged by identifier
  * - Glosses deduplicated by [language+content]
+ * - Recursively collects contains and translations
  */
 export async function downloadSituation(
   identifier: string,
@@ -33,18 +83,19 @@ export async function downloadSituation(
 ): Promise<void> {
   const situation = await fetchSituation(identifier, nativeLanguages);
 
-  // Extract all unique glosses from challenge arrays
-  // Challenges ARE glosses in the new architecture (no wrapper objects)
+  // Extract all unique glosses recursively from challenge arrays
   const allGlosses = new Map<string, typeof situation.challengesOfExpression[0]>();
 
   // Collect glosses from expression challenges (already GlossDTO[])
+  // These are native language glosses with target language translations
   situation.challengesOfExpression.forEach(gloss => {
-    allGlosses.set(gloss.id, gloss);
+    collectAllGlossesRecursive(gloss, allGlosses);
   });
 
   // Collect glosses from understanding challenges (already GlossDTO[])
+  // These are target language glosses with native language translations
   situation.challengesOfUnderstandingText.forEach(gloss => {
-    allGlosses.set(gloss.id, gloss);
+    collectAllGlossesRecursive(gloss, allGlosses);
   });
 
   // Upsert all glosses (smart merge by [language+content])
