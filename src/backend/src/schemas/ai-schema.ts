@@ -10,6 +10,8 @@ export const generateChallengesRequestSchema = z.object({
   targetLanguage: languageCodeSchema,
   nativeLanguage: languageCodeSchema,
   userHints: z.string().optional(),
+  provider: z.enum(["openai", "gemini"]).optional(),
+  runId: z.string().optional(),
 });
 
 /**
@@ -17,6 +19,7 @@ export const generateChallengesRequestSchema = z.object({
  * Supports nested contains relationships
  */
 export interface GlossPayload {
+  id?: string;
   content: string;
   isParaphrased: boolean;
   translation?: string;  // Translation content in native language
@@ -39,6 +42,7 @@ export interface GlossPayload {
  */
 export const glossPayloadSchema: z.ZodType<GlossPayload> = z.lazy(() =>
   z.object({
+    id: z.string().optional(),
     content: z.string().min(1),
     isParaphrased: z.boolean().default(false),
     translation: z.string().optional(),

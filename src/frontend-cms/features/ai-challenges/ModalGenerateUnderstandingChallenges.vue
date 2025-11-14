@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onBeforeUnmount } from "vue";
 import { Sparkles, Trash2, AlertCircle } from "lucide-vue-next";
 import type { SituationDTO, LanguageCode } from "@sbl/shared";
 import { useToast } from "../../dumb/toasts/index";
 import ModalAgentRunLog from "./ModalAgentRunLog.vue";
 
 interface GlossPayload {
+  id?: string;
   content: string;
   isParaphrased: boolean;
   transcriptions?: string[];
@@ -26,11 +27,13 @@ interface AgentRunLogEntry {
 
 interface AgenticMetadata {
   mode: "agentic";
+  provider?: "openai" | "gemini";
   iterations: number;
   toolCalls: number;
   count: number;
   errors: string[];
   logs?: AgentRunLogEntry[];
+  runId?: string;
 }
 
 interface Props {
@@ -59,9 +62,16 @@ const metadata = ref<AgenticMetadata | null>(null);
 const errorMessage = ref<string | null>(null);
 const runLogs = ref<AgentRunLogEntry[]>([]);
 const showLogsModal = ref(false);
+const currentRunId = ref<string | null>(null);
+const logStreamActive = ref(false);
+const hasRunLogs = computed(() => runLogs.value.length > 0);
+const canViewLogs = computed(() =>
+  logStreamActive.value || hasRunLogs.value || Boolean(currentRunId.value)
+);
+let logEventSource: EventSource | null = null;
+const provider = ref<"openai" | "gemini">("openai");
 
 const selectedCount = computed(() => selectedIndices.value.size);
-const hasRunLogs = computed(() => runLogs.value.length > 0);
 
 function toggleSelection(index: number) {
   if (selectedIndices.value.has(index)) {
@@ -81,6 +91,48 @@ function deselectAll() {
   selectedIndices.value = new Set();
 }
 
+function startLogStream(runId: string) {
+  stopLogStream();
+  try {
+    const source = new EventSource(`${API_BASE_URL}/ai/run-logs/${runId}`);
+    logEventSource = source;
+    logStreamActive.value = true;
+    source.onopen = () => {
+      logStreamActive.value = true;
+    };
+    source.onmessage = (event) => {
+      if (!event.data) return;
+      try {
+        const entry: AgentRunLogEntry = JSON.parse(event.data);
+        runLogs.value = [...runLogs.value, entry];
+      } catch {
+        // ignore malformed messages
+      }
+    };
+    source.addEventListener("end", () => {
+      stopLogStream();
+    });
+    source.onerror = () => {
+      stopLogStream();
+    };
+  } catch (error) {
+    console.error("Failed to start log stream", error);
+    stopLogStream();
+  }
+}
+
+function stopLogStream() {
+  if (logEventSource) {
+    logEventSource.close();
+    logEventSource = null;
+  }
+  logStreamActive.value = false;
+}
+
+onBeforeUnmount(() => {
+  stopLogStream();
+});
+
 async function handleGenerate() {
   isGenerating.value = true;
   metadata.value = null;
@@ -89,12 +141,21 @@ async function handleGenerate() {
   showLogsModal.value = false;
 
   try {
+    const runId = typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2);
+    currentRunId.value = runId;
+    startLogStream(runId);
+    showLogsModal.value = true;
+
     const endpoint = "/ai/generate-understanding-challenges/agentic";
     const body = {
       situationId: props.situation.id,
       targetLanguage: props.situation.targetLanguage,
       nativeLanguage: props.nativeLanguage,
+      runId,
       userHints: userHints.value || undefined,
+      provider: provider.value,
     };
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -134,6 +195,7 @@ async function handleGenerate() {
     toast.error(`Failed to generate`);
   } finally {
     isGenerating.value = false;
+    stopLogStream();
   }
 }
 
@@ -183,9 +245,10 @@ function handleClose() {
   selectedIndices.value = new Set();
   metadata.value = null;
   userHints.value = "";
+  errorMessage.value = null;
+  stopLogStream();
   runLogs.value = [];
   showLogsModal.value = false;
-  errorMessage.value = null;
   emit("close");
 }
 
@@ -239,6 +302,43 @@ function renderContainsTree(contains: GlossPayload[], depth = 0): string {
           </p>
         </div>
 
+        <fieldset class="fieldset">
+          <label class="label">AI Provider</label>
+          <div class="join">
+            <button
+              type="button"
+              class="btn btn-sm join-item"
+              :class="provider === 'openai' ? 'btn-primary' : 'btn-outline'"
+              @click="provider = 'openai'"
+            >
+              OpenAI
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm join-item"
+              :class="provider === 'gemini' ? 'btn-primary' : 'btn-outline'"
+              @click="provider = 'gemini'"
+            >
+              Gemini
+            </button>
+          </div>
+        </fieldset>
+
+        <div class="flex items-center justify-between mb-4 text-sm text-base-content/70">
+          <span v-if="logStreamActive" class="inline-flex items-center gap-2 text-success">
+            <span class="loading loading-spinner loading-xs"></span>
+            Streaming logs…
+          </span>
+          <button
+            type="button"
+            class="btn btn-ghost btn-xs"
+            :disabled="!canViewLogs"
+            @click="showLogsModal = true"
+          >
+            View run log
+          </button>
+        </div>
+
       <!-- User Hints -->
       <fieldset class="fieldset">
         <label for="hints" class="label">Additional hints (optional)</label>
@@ -272,18 +372,25 @@ function renderContainsTree(contains: GlossPayload[], depth = 0): string {
         <AlertCircle :size="16" />
         <div class="flex-1">
           <div>
+            <span class="font-semibold text-xs uppercase tracking-wide text-base-content/60">
+              Provider:
+            </span>
+            <span class="mr-2">{{ metadata.provider ?? 'openai' }}</span>
             Generated {{ metadata.count }} gloss{{ metadata.count !== 1 ? "es" : "" }}
             <template v-if="metadata.iterations">
               in {{ metadata.iterations }} iteration{{ metadata.iterations !== 1 ? "s" : "" }}
               ({{ metadata.toolCalls }} tool calls)
             </template>
           </div>
+          <div v-if="metadata.runId" class="text-xs text-base-content/60 mt-1">
+            Run ID: {{ metadata.runId }}
+          </div>
           <div v-if="metadata.errors?.length" class="text-xs text-base-content/70 mt-1">
             {{ metadata.errors.length }} error{{ metadata.errors.length === 1 ? "" : "s" }} recorded during the run
           </div>
         </div>
         <button
-          v-if="hasRunLogs"
+          v-if="canViewLogs"
           class="btn btn-ghost btn-xs"
           type="button"
           @click="showLogsModal = true"

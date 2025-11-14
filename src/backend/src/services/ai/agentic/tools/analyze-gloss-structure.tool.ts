@@ -8,13 +8,8 @@ import { LanguageCode } from "@sbl/shared";
 import { languageCodeSchema } from "../../../../schemas/common";
 
 const analyzeSchema = z.object({
-  glossId: z.string().describe("Existing gloss ID to analyze").optional(),
   language: languageCodeSchema.describe("Language code of the gloss content"),
   content: z.string().min(1).describe("Gloss content to analyze"),
-  situationSummary: z
-    .string()
-    .optional()
-    .describe("Optional short situation summary or hints for additional context"),
 });
 
 interface AnalyzeInput extends z.infer<typeof analyzeSchema> {}
@@ -38,12 +33,11 @@ export function createAnalyzeGlossStructureTool(glossService: GlossService) {
   return tool(
     async (args: AnalyzeInput) => {
       try {
-        const { glossId, language, content, situationSummary } = args;
+        const { language, content } = args;
 
         // 1. Reuse existing contains if present
         const existing = await fetchExistingGloss(
           glossService,
-          glossId,
           language as LanguageCode,
           content
         );
@@ -63,7 +57,6 @@ export function createAnalyzeGlossStructureTool(glossService: GlossService) {
         const analysis = await analyzeWithLLM(llm, {
           gloss: content,
           language,
-          situationSummary,
         });
 
         return JSON.stringify({
@@ -93,31 +86,22 @@ export function createAnalyzeGlossStructureTool(glossService: GlossService) {
 
 async function fetchExistingGloss(
   glossService: GlossService,
-  glossId: string | undefined,
   language: LanguageCode,
   content: string
 ) {
-  if (glossId) {
-    try {
-      return await glossService.findById(glossId);
-    } catch {
-      // ignore and fallback to search
-    }
-  }
   const matches = await glossService.list(language, content);
   return matches.length > 0 ? matches[0] : null;
 }
 
 async function analyzeWithLLM(
   llm: ChatOpenAI,
-  params: { gloss: string; language: string; situationSummary?: string }
+  params: { gloss: string; language: string }
 ): Promise<StructureResult> {
   const systemPrompt = `You help language teachers decide whether a gloss should be split into sub-parts for comprehension practice.
 Consider the semantics even if the language lacks spaces or punctuation. Only call something splittable when the learner genuinely benefits.`;
 
   const userPrompt = `Gloss language: ${params.language}
 Gloss content: ${params.gloss}
-Situation summary: ${params.situationSummary ?? "(not provided)"}
 
 Return JSON with:
 {

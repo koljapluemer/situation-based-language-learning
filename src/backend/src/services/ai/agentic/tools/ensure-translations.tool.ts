@@ -2,19 +2,12 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { GlossService } from "../../../gloss-service";
 import { GlossCreationHelper } from "../../gloss-creation-helper";
-import { languageCodeSchema, noteSchema } from "../../../../schemas/common";
-import { GlossPayload } from "../../../../schemas/ai-schema";
+import { languageCodeSchema } from "../../../../schemas/common";
 import { LanguageCode } from "@sbl/shared";
 
-const translationPayloadSchema: z.ZodType<GlossPayload> = z.lazy(() =>
-  z.object({
-    content: z.string().min(1).describe("Translation content in the native language"),
-    isParaphrased: z.boolean().default(false),
-    transcriptions: z.array(z.string()).optional(),
-    notes: z.array(noteSchema).optional(),
-    contains: z.array(translationPayloadSchema).optional(),
-  })
-);
+const translationPayloadSchema = z.object({
+  content: z.string().min(1).describe("Translation content in the native language"),
+});
 
 const ensureTranslationsSchema = z.object({
   glossId: z.string().min(1).describe("Existing gloss ID to attach translations to"),
@@ -57,7 +50,7 @@ export function createEnsureTranslationsTool(
         const result = await glossCreationHelper.ensureTranslationsForGloss(
           glossId,
           nativeLanguage as LanguageCode,
-          translations as GlossPayload[]
+          translations
         );
 
         return JSON.stringify({
@@ -77,7 +70,7 @@ export function createEnsureTranslationsTool(
       name: "ensureGlossTranslations",
       description:
         "Ensure that a gloss has translations in the situation's native language. " +
-        "Provide one or more translation payloads (content, notes, etc.). " +
+        "Provide one or more translation payloads (content plus optional paraphrase flag). " +
         "The tool will create any missing translation glosses and link them to the specified gloss.",
       schema: ensureTranslationsSchema,
     }

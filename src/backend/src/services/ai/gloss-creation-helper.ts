@@ -1,4 +1,4 @@
-import { LanguageCode } from "@sbl/shared";
+import { GlossDTO, LanguageCode } from "@sbl/shared";
 import { GlossService } from "../gloss-service";
 import { GlossPayload } from "../../schemas/ai-schema";
 import { GlossWriteInput, GlossUpdateInput } from "../../schemas/gloss-schema";
@@ -34,8 +34,7 @@ export class GlossCreationHelper {
     payload: GlossPayload,
     language: LanguageCode
   ): Promise<string> {
-    const existingGlosses = await this.glossService.list(language, payload.content);
-    const existingGloss = existingGlosses[0];
+    const existingGloss = await this.resolveExistingGloss(language, payload);
 
     // Process contains recursively (depth-first)
     const containsIds: string[] = [];
@@ -208,8 +207,7 @@ export class GlossCreationHelper {
     targetLanguage: LanguageCode,
     nativeLanguage: LanguageCode
   ): Promise<string> {
-    const existingGlosses = await this.glossService.list(targetLanguage, payload.content);
-    const existingGloss = existingGlosses[0];
+    const existingGloss = await this.resolveExistingGloss(targetLanguage, payload);
 
     let translationId: string | undefined;
     if (payload.translation) {
@@ -377,7 +375,7 @@ export class GlossCreationHelper {
   async ensureTranslationsForGloss(
     glossId: string,
     nativeLanguage: LanguageCode,
-    translations: GlossPayload[]
+    translations: Array<{ content: string; isParaphrased?: boolean }>
   ): Promise<{
     addedTranslationIds: string[];
     totalTranslationIds: string[];
@@ -399,10 +397,7 @@ export class GlossCreationHelper {
       const translationId = await this.createGlossWithContains(
         {
           content: translation.content,
-          isParaphrased: translation.isParaphrased,
-          transcriptions: translation.transcriptions,
-          notes: translation.notes,
-          contains: translation.contains,
+          isParaphrased: false,
         },
         nativeLanguage
       );
@@ -447,5 +442,24 @@ export class GlossCreationHelper {
 
   private uniqueIds(ids: string[]): string[] {
     return Array.from(new Set(ids));
+  }
+
+  private async resolveExistingGloss(
+    language: LanguageCode,
+    payload: GlossPayload
+  ): Promise<GlossDTO | null> {
+    if (payload.id) {
+      try {
+        const gloss = await this.glossService.findById(payload.id);
+        if (gloss.language === language) {
+          return gloss;
+        }
+      } catch {
+        // fall back to content search
+      }
+    }
+
+    const existingGlosses = await this.glossService.list(language, payload.content);
+    return existingGlosses.length > 0 ? existingGlosses[0] : null;
   }
 }

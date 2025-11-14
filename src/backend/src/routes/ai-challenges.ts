@@ -9,6 +9,11 @@ import {
   saveChallengesRequestSchema,
 } from "../schemas/ai-schema";
 import { LanguageCode } from "@sbl/shared";
+import { AI_CONFIG } from "../config/ai-config";
+import {
+  subscribeRunCompletion,
+  subscribeRunLogs,
+} from "../services/ai/run-log-stream";
 
 const paramsSchema = z.object({ id: z.string().min(1) });
 
@@ -21,6 +26,42 @@ export function registerAIChallengeRoutes(app: FastifyInstance) {
   const glossService = new GlossService();
   const situationService = new SituationService();
   const glossCreationHelper = new GlossCreationHelper(glossService);
+
+  app.get("/ai/run-logs/:id", async (request, reply) => {
+    const { id } = paramsSchema.parse(request.params);
+    reply.hijack();
+    const origin = (request.headers.origin as string | undefined) ?? "*";
+    reply.raw.setHeader("Access-Control-Allow-Origin", origin);
+    reply.raw.setHeader("Vary", "Origin");
+    reply.raw.setHeader("Access-Control-Allow-Credentials", "true");
+    reply.raw.setHeader("Content-Type", "text/event-stream");
+    reply.raw.setHeader("Cache-Control", "no-cache");
+    reply.raw.setHeader("Connection", "keep-alive");
+    reply.raw.flushHeaders?.();
+    reply.raw.write(":\n\n");
+
+    let closed = false;
+    const cleanup = () => {
+      if (closed) return;
+      closed = true;
+      unsubscribeLogs();
+      unsubscribeEnd();
+      reply.raw.end();
+    };
+
+    const unsubscribeLogs = subscribeRunLogs(id, entry => {
+      if (closed) return;
+      reply.raw.write(`data: ${JSON.stringify(entry)}\n\n`);
+    });
+
+    const unsubscribeEnd = subscribeRunCompletion(id, () => {
+      if (closed) return;
+      reply.raw.write(`event: end\ndata: {}\n\n`);
+      cleanup();
+    });
+
+    request.raw.on("close", cleanup);
+  });
 
 /**
  * POST /ai/generate-understanding-challenges/agentic
@@ -38,6 +79,8 @@ export function registerAIChallengeRoutes(app: FastifyInstance) {
         targetLanguage: payload.targetLanguage,
         nativeLanguage: payload.nativeLanguage,
         userHints: payload.userHints,
+        provider: payload.provider,
+        runId: payload.runId,
       };
 
       // Generate with agentic mode
@@ -56,6 +99,8 @@ export function registerAIChallengeRoutes(app: FastifyInstance) {
         duplicates,
         metadata: {
           mode: "agentic",
+          provider: context.provider ?? AI_CONFIG.provider,
+          runId: result.runId,
           iterations: result.iterations,
           toolCalls: result.toolCalls,
           count: result.glosses.length,

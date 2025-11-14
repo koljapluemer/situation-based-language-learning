@@ -5,12 +5,14 @@
  * Change the `provider` field to switch between OpenAI and Gemini.
  */
 
+export type AIProvider = "openai" | "gemini";
+
 export const AI_CONFIG = {
   /**
    * Active AI provider: 'openai' | 'gemini'
    * Change this value to switch providers globally
    */
-  provider: 'gemini' as 'openai' | 'gemini',
+  provider: 'gemini' as AIProvider,
 
   /**
    * Model configurations for each provider
