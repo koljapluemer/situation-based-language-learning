@@ -1,4 +1,4 @@
-import type { SituationDTO, SituationSummaryDTO, LanguageCode } from '@sbl/shared';
+import type { SituationDTO, SituationSummaryDTO, LanguageCode, GlossDTO } from '@sbl/shared';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3333';
 
@@ -47,6 +47,20 @@ export async function fetchSituation(
 
   if (!response.ok) {
     throw new Error(`Failed to fetch situation: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.data;
+}
+
+/**
+ * Fetch a single gloss by ID
+ */
+export async function fetchGloss(glossId: string): Promise<GlossDTO> {
+  const response = await fetch(`${API_BASE_URL}/glosses/${glossId}`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch gloss ${glossId}: ${response.statusText}`);
   }
 
   const data = await response.json();

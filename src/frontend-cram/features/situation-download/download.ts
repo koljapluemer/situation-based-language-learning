@@ -1,5 +1,5 @@
 import type { LanguageCode } from '@sbl/shared';
-import { fetchSituationSummaries, fetchSituation } from './api';
+import { fetchSituationSummaries, fetchSituation, fetchGloss } from './api';
 import { upsertSituationSummary, upsertSituation } from '../../entities/situation';
 import { upsertGlosses } from '../../entities/gloss';
 
@@ -22,48 +22,35 @@ export async function downloadSituationSummaries(
 }
 
 /**
- * Recursively collect all glosses from a GlossDTO tree
- * Includes: the gloss itself, all contains (recursive), all translations (depth 1)
+ * Collect all gloss IDs from a GlossDTO (including all relation IDs)
+ * The backend returns GlossReference (lightweight {id, language, content}) for relations,
+ * so we need to collect IDs and fetch them separately
  */
-function collectAllGlossesRecursive(
+function collectAllGlossIds(
   gloss: any,
-  collected: Map<string, any>
+  collected: Set<string>
 ): void {
   // Avoid cycles
   if (collected.has(gloss.id)) return;
 
-  // Add this gloss
-  collected.set(gloss.id, gloss);
+  // Add this gloss ID
+  collected.add(gloss.id);
 
-  // Recursively collect contains glosses
-  if (gloss.contains && Array.isArray(gloss.contains)) {
-    gloss.contains.forEach((containedGloss: any) => {
-      collectAllGlossesRecursive(containedGloss, collected);
-    });
-  }
-
-  // Collect translations (depth 1, not recursive)
-  if (gloss.translations && Array.isArray(gloss.translations)) {
-    gloss.translations.forEach((translation: any) => {
-      if (!collected.has(translation.id)) {
-        collected.set(translation.id, translation);
-      }
-    });
-  }
-
-  // Also collect other relations at depth 1 if present
-  const otherRelations = [
+  // Collect IDs from all relation arrays (these are GlossReference objects with .id)
+  const relations = [
+    'contains',
+    'translations',
     'nearSynonyms',
     'nearHomophones',
     'clarifiesUsage',
     'toBeDifferentiatedFrom'
   ];
 
-  otherRelations.forEach(relation => {
+  relations.forEach(relation => {
     if (gloss[relation] && Array.isArray(gloss[relation])) {
-      gloss[relation].forEach((relatedGloss: any) => {
-        if (!collected.has(relatedGloss.id)) {
-          collected.set(relatedGloss.id, relatedGloss);
+      gloss[relation].forEach((ref: any) => {
+        if (ref.id && !collected.has(ref.id)) {
+          collected.add(ref.id);
         }
       });
     }
@@ -71,11 +58,11 @@ function collectAllGlossesRecursive(
 }
 
 /**
- * Download full situation details including glosses
+ * Download full situation details including ALL related glosses
  * Performs smart merge:
  * - Situations merged by identifier
  * - Glosses deduplicated by [language+content]
- * - Recursively collects contains and translations
+ * - Recursively fetches all referenced glosses (contains, translations, etc.)
  */
 export async function downloadSituation(
   identifier: string,
@@ -83,26 +70,64 @@ export async function downloadSituation(
 ): Promise<void> {
   const situation = await fetchSituation(identifier, nativeLanguages);
 
-  // Extract all unique glosses recursively from challenge arrays
-  const allGlosses = new Map<string, typeof situation.challengesOfExpression[0]>();
+  console.log('[downloadSituation] Downloaded situation:', identifier);
+  console.log('[downloadSituation] Expression challenges:', situation.challengesOfExpression.length);
+  console.log('[downloadSituation] Understanding challenges:', situation.challengesOfUnderstandingText.length);
 
-  // Collect glosses from expression challenges (already GlossDTO[])
-  // These are native language glosses with target language translations
+  // Phase 1: Collect all gloss IDs from the situation
+  const glossIdsToFetch = new Set<string>();
+
   situation.challengesOfExpression.forEach(gloss => {
-    collectAllGlossesRecursive(gloss, allGlosses);
+    collectAllGlossIds(gloss, glossIdsToFetch);
   });
 
-  // Collect glosses from understanding challenges (already GlossDTO[])
-  // These are target language glosses with native language translations
   situation.challengesOfUnderstandingText.forEach(gloss => {
-    collectAllGlossesRecursive(gloss, allGlosses);
+    collectAllGlossIds(gloss, glossIdsToFetch);
   });
 
-  // Upsert all glosses (smart merge by [language+content])
-  await upsertGlosses(Array.from(allGlosses.values()));
+  console.log('[downloadSituation] Total gloss IDs to fetch:', glossIdsToFetch.size);
 
-  // Upsert situation (smart merge by identifier)
+  // Phase 2: Fetch all glosses individually by ID
+  // This is necessary because the backend only returns GlossReference objects
+  // in the relations (not full nested GlossDTO objects)
+  const allGlosses: any[] = [];
+  const fetchedIds = new Set<string>();
+
+  // Keep fetching until no new IDs are discovered
+  let lastSize = 0;
+  while (glossIdsToFetch.size > lastSize) {
+    lastSize = glossIdsToFetch.size;
+
+    // Fetch all glosses we haven't fetched yet
+    const idsToFetch = Array.from(glossIdsToFetch).filter(id => !fetchedIds.has(id));
+
+    console.log('[downloadSituation] Fetching batch of', idsToFetch.length, 'glosses');
+
+    for (const glossId of idsToFetch) {
+      try {
+        const gloss = await fetchGloss(glossId);
+        allGlosses.push(gloss);
+        fetchedIds.add(glossId);
+
+        // This gloss might reference more glosses, so collect their IDs too
+        collectAllGlossIds(gloss, glossIdsToFetch);
+      } catch (error) {
+        console.warn('[downloadSituation] Failed to fetch gloss', glossId, error);
+      }
+    }
+  }
+
+  console.log('[downloadSituation] Fetched', allGlosses.length, 'total glosses');
+
+  // Phase 3: Upsert all glosses (smart merge by [language+content])
+  if (allGlosses.length > 0) {
+    await upsertGlosses(allGlosses);
+  }
+
+  // Phase 4: Upsert situation (smart merge by identifier)
   await upsertSituation(situation);
+
+  console.log('[downloadSituation] Download complete for', identifier);
 }
 
 /**

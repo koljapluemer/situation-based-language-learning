@@ -92,6 +92,9 @@ function selectNextGloss(): GlossEntity | null {
 
   // Find all glosses that need practice and have dependencies met
   for (const gloss of allGlosses.value.values()) {
+    // Skip if this is a challenge gloss (they're only for the final test)
+    if (challengeGlossIds.value.includes(gloss.id!)) continue;
+
     // Skip if this was the last practiced gloss
     if (gloss.id === lastPracticedGlossId.value) continue;
 
