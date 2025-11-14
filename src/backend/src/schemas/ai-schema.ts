@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { languageCodeSchema, noteSchema } from "./common";
+import { LanguageCode } from "@sbl/shared";
 
 /**
  * Request schema for generating understanding challenges
@@ -19,6 +20,7 @@ export const generateChallengesRequestSchema = z.object({
 export interface GlossPayload {
   content: string;
   isParaphrased: boolean;
+  translation?: string;  // Translation content in native language
   transcriptions?: string[];
   notes?: Array<{
     noteType: string;
@@ -40,6 +42,7 @@ export const glossPayloadSchema: z.ZodType<GlossPayload> = z.lazy(() =>
   z.object({
     content: z.string().min(1),
     isParaphrased: z.boolean().default(false),
+    translation: z.string().optional(),
     transcriptions: z.array(z.string()).optional(),
     notes: z.array(noteSchema).optional(),
     contains: z.array(glossPayloadSchema).optional(),  // Recursive reference
@@ -56,6 +59,7 @@ export const glossPayloadSchema: z.ZodType<GlossPayload> = z.lazy(() =>
  */
 export const saveChallengesRequestSchema = z.object({
   selectedGlosses: z.array(glossPayloadSchema),
+  nativeLanguage: languageCodeSchema,
 });
 
 /**

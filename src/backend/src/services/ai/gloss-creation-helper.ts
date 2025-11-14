@@ -129,4 +129,114 @@ export class GlossCreationHelper {
 
     return duplicates;
   }
+
+  /**
+   * Create a gloss with translation and recursive contains relationships
+   *
+   * This method:
+   * 1. Creates the translation gloss first (if translation content provided)
+   * 2. Recursively creates all contains children (with their translations)
+   * 3. Creates the main gloss with links to translation and contains
+   * 4. Returns the created gloss ID
+   *
+   * @param payload - The gloss payload (with optional translation content)
+   * @param targetLanguage - Language code for the main gloss
+   * @param nativeLanguage - Language code for translation glosses
+   * @returns The created (or existing) gloss ID
+   */
+  async createGlossWithTranslation(
+    payload: GlossPayload,
+    targetLanguage: LanguageCode,
+    nativeLanguage: LanguageCode
+  ): Promise<string> {
+    // Check if this gloss already exists
+    const existingGlosses = await this.glossService.list(targetLanguage, payload.content);
+    if (existingGlosses.length > 0) {
+      return existingGlosses[0].id;
+    }
+
+    // Step 1: Create translation gloss if translation content provided
+    let translationId: string | undefined;
+    if (payload.translation) {
+      // Build translation payload (mirror structure for contains if present)
+      const translationPayload: GlossPayload = {
+        content: payload.translation,
+        isParaphrased: payload.isParaphrased,
+        transcriptions: [], // Translation typically doesn't need transcriptions
+        notes: [], // Translation typically doesn't need notes
+        // If the main gloss has contains, build translation contains from child translations
+        contains: payload.contains?.map(child => ({
+          content: child.translation || child.content,
+          isParaphrased: child.isParaphrased,
+          transcriptions: [],
+        })),
+      };
+
+      // Recursively create translation gloss (swap languages)
+      translationId = await this.createGlossWithTranslation(
+        translationPayload,
+        nativeLanguage,
+        targetLanguage
+      );
+    }
+
+    // Step 2: Recursively create contains children (with their translations)
+    const containsIds: string[] = [];
+    if (payload.contains && payload.contains.length > 0) {
+      for (const childPayload of payload.contains) {
+        const childId = await this.createGlossWithTranslation(
+          childPayload,
+          targetLanguage,
+          nativeLanguage
+        );
+        containsIds.push(childId);
+      }
+    }
+
+    // Step 3: Prepare the write input for the main gloss
+    const writeInput: GlossWriteInput = {
+      language: targetLanguage,
+      content: payload.content,
+      isParaphrased: payload.isParaphrased ?? false,
+      transcriptions: payload.transcriptions ?? [],
+      notes: payload.notes ?? [],
+      containsIds,
+      translationIds: translationId ? [translationId] : [],
+      nearSynonymIds: payload.nearSynonymIds ?? [],
+      nearHomophoneIds: payload.nearHomophoneIds ?? [],
+      clarifiesUsageIds: payload.clarifiesUsageIds ?? [],
+      toBeDifferentiatedFromIds: payload.toBeDifferentiatedFromIds ?? [],
+    };
+
+    // Step 4: Create the main gloss
+    const createdGloss = await this.glossService.create(writeInput);
+    return createdGloss.id;
+  }
+
+  /**
+   * Create multiple glosses with translations in batch
+   *
+   * @param payloads - Array of gloss payloads
+   * @param targetLanguage - Language code for main glosses
+   * @param nativeLanguage - Language code for translation glosses
+   * @returns Array of created (or existing) gloss IDs
+   */
+  async createMultipleGlossesWithTranslations(
+    payloads: GlossPayload[],
+    targetLanguage: LanguageCode,
+    nativeLanguage: LanguageCode
+  ): Promise<string[]> {
+    const glossIds: string[] = [];
+
+    for (const payload of payloads) {
+      const glossId = await this.createGlossWithTranslation(
+        payload,
+        targetLanguage,
+        nativeLanguage
+      );
+      glossIds.push(glossId);
+    }
+
+    return glossIds;
+  }
 }

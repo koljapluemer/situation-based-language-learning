@@ -72,6 +72,7 @@ class OpenAIProvider implements ClassicAIProvider {
                     properties: {
                       content: { type: "string" },
                       isParaphrased: { type: "boolean" },
+                      translation: { type: "string" },
                       transcriptions: { type: "array", items: { type: "string" } },
                       notes: {
                         type: "array",
@@ -93,15 +94,16 @@ class OpenAIProvider implements ClassicAIProvider {
                           properties: {
                             content: { type: "string" },
                             isParaphrased: { type: "boolean" },
+                            translation: { type: "string" },
                             transcriptions: { type: "array", items: { type: "string" } },
                             contains: { type: "array", items: {} }, // Allow nested
                           },
-                          required: ["content", "isParaphrased"],
+                          required: ["content", "isParaphrased", "translation"],
                           additionalProperties: false,
                         },
                       },
                     },
-                    required: ["content", "isParaphrased"],
+                    required: ["content", "isParaphrased", "translation"],
                     additionalProperties: false,
                   },
                 },
@@ -159,9 +161,14 @@ Key guidelines:
    - Usually 1 level deep (sentence → words)
    - Can go deeper for complex structures (word → root/stem)
    - Example: "¿Cómo estás?" contains ["cómo", "estás" which contains ["estar (root)"]]
-5. **Avoid duplicates**: Do not generate glosses that are identical to existing ones
-6. **Transcriptions**: Provide IPA or phonetic transcriptions where helpful
-7. **Notes**: Add helpful notes about usage, formality, context, etc.
+5. **Translations**: REQUIRED - Provide a translation in ${context.nativeLanguage} for EVERY gloss (including all glosses in the contains tree)
+   - Use the "translation" field for each gloss
+   - The translation should be natural and contextually appropriate
+   - For paraphrased glosses, translate the descriptive text
+   - Example: { content: "¿Cómo estás?", translation: "How are you?", contains: [{ content: "cómo", translation: "how" }, { content: "estás", translation: "are" }]}
+6. **Avoid duplicates**: Do not generate glosses that are identical to existing ones
+7. **Transcriptions**: Provide IPA or phonetic transcriptions where helpful
+8. **Notes**: Add helpful notes about usage, formality, context, etc.
 
 Situation context:
 - Identifier: ${context.situation.identifier}
@@ -248,9 +255,14 @@ Key guidelines:
    - Usually 1 level deep (sentence → words)
    - Can go deeper for complex structures (word → root/stem)
    - Example: "¿Cómo estás?" contains ["cómo", "estás" which contains ["estar (root)"]]
-5. **Avoid duplicates**: Do not generate glosses that are identical to existing ones
-6. **Transcriptions**: Provide IPA or phonetic transcriptions where helpful
-7. **Notes**: Add helpful notes about usage, formality, context, etc.
+5. **Translations**: REQUIRED - Provide a translation in ${context.nativeLanguage} for EVERY gloss (including all glosses in the contains tree)
+   - Use the "translation" field for each gloss
+   - The translation should be natural and contextually appropriate
+   - For paraphrased glosses, translate the descriptive text
+   - Example: { content: "¿Cómo estás?", translation: "How are you?", contains: [{ content: "cómo", translation: "how" }, { content: "estás", translation: "are" }]}
+6. **Avoid duplicates**: Do not generate glosses that are identical to existing ones
+7. **Transcriptions**: Provide IPA or phonetic transcriptions where helpful
+8. **Notes**: Add helpful notes about usage, formality, context, etc.
 
 Situation context:
 - Identifier: ${context.situation.identifier}
@@ -264,12 +276,14 @@ Return a JSON object with this structure:
     {
       "content": "string",
       "isParaphrased": boolean,
+      "translation": "string",
       "transcriptions": ["string"],
       "notes": [{ "noteType": "string", "content": "string", "showBeforeSolution": boolean }],
       "contains": [
         {
           "content": "string",
           "isParaphrased": boolean,
+          "translation": "string",
           "transcriptions": ["string"],
           "contains": []
         }
