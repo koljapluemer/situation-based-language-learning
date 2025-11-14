@@ -30,18 +30,24 @@ const currentTask = ref<Task | null>(null);
 const lastPracticedGlossId = ref<string | null>(null);
 const isComplete = ref(false);
 
-// Computed: Check if all challenge glosses are ready (recall > 0.95)
+// Computed: Check if all dependency glosses are ready (recall > 0.95)
+// Note: We check dependencies, not the challenge glosses themselves,
+// because challenge glosses are excluded from normal practice
 const allGlossesReady = computed(() => {
   // If no challenge glosses, not ready
   if (challengeGlossIds.value.length === 0) return false;
 
-  for (const glossId of challengeGlossIds.value) {
-    const gloss = allGlosses.value.get(glossId);
-    if (!gloss) return false; // Missing gloss means not ready
+  // Check all non-challenge glosses (dependencies)
+  for (const gloss of allGlosses.value.values()) {
+    // Skip challenge glosses themselves
+    if (challengeGlossIds.value.includes(gloss.id!)) continue;
+
+    // All other glosses must have recall >= 0.95
     if (getRecallProbability(gloss) < 0.95) {
       return false;
     }
   }
+
   return true;
 });
 
