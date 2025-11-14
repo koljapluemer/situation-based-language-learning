@@ -1,5 +1,6 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { LanguageCode, SituationDTO } from "@sbl/shared";
+import type { StructuredToolInterface } from "@langchain/core/tools";
 import { GlossPayload } from "../../../schemas/ai-schema";
 import { AI_CONFIG } from "../../../config/ai-config";
 import { env } from "../../../env";
@@ -24,11 +25,21 @@ export interface AgenticGenerationContext {
 /**
  * Result from agentic generation
  */
+export type AgenticLogType = "info" | "tool" | "error" | "result";
+
+export interface AgenticGenerationLogEntry {
+  timestamp: string;
+  type: AgenticLogType;
+  message: string;
+  details?: unknown;
+}
+
 export interface AgenticGenerationResult {
   glosses: GlossPayload[];
   iterations: number;
   toolCalls: number;
   errors: string[];
+  logs: AgenticGenerationLogEntry[];
 }
 
 /**
@@ -44,8 +55,10 @@ export interface AgenticGenerationResult {
  */
 export class AgenticGenerator {
   private readonly model: ChatOpenAI;
+  private readonly agentRunner: ReturnType<ChatOpenAI["bindTools"]>;
   private readonly glossService: GlossService;
   private readonly situationService: SituationService;
+  private readonly tools: Map<string, StructuredToolInterface>;
 
   constructor(
     glossService?: GlossService,
@@ -70,13 +83,15 @@ export class AgenticGenerator {
       createAnalyzeSituationTool(this.situationService),
       createValidateGlossStructureTool(this.glossService),
     ];
+    this.tools = new Map(tools.map(tool => [tool.name, tool]));
 
     // Initialize model with tools
     this.model = new ChatOpenAI({
       model: AI_CONFIG.models.openai.agentic,
       temperature: 0.7,
       apiKey: env.OPENAI_API_KEY,
-    }).bindTools(tools);
+    });
+    this.agentRunner = this.model.bindTools(tools);
   }
 
   /**
@@ -101,6 +116,13 @@ export class AgenticGenerator {
     let iterations = 0;
     let toolCalls = 0;
     const errors: string[] = [];
+    const logs: AgenticGenerationLogEntry[] = [];
+    this.recordLog(logs, "info", "Starting agentic generation run", {
+      situationId: context.situationId,
+      targetLanguage: context.targetLanguage,
+      nativeLanguage: context.nativeLanguage,
+      hasHints: Boolean(context.userHints),
+    });
     const messages: any[] = [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
@@ -109,10 +131,16 @@ export class AgenticGenerator {
     // ReAct loop: agent calls tools, processes results, decides when done
     while (iterations < AI_CONFIG.agentic.maxIterations) {
       iterations++;
+      this.recordLog(logs, "info", `Iteration ${iterations} started`);
 
       try {
-        const response = await this.model.invoke(messages);
+        const response = await this.agentRunner.invoke(messages);
         messages.push(response);
+        const responseSummary = this.summarizeResponse(response.content);
+        this.recordLog(logs, "info", `Iteration ${iterations} model response`, {
+          toolCalls: response.tool_calls?.map((call) => call.name) ?? [],
+          responseSummary,
+        });
 
         // Check if agent called tools
         if (response.tool_calls && response.tool_calls.length > 0) {
@@ -120,8 +148,11 @@ export class AgenticGenerator {
 
           // Execute tool calls
           for (const toolCall of response.tool_calls) {
-            const tool = this.model.boundTools?.find(t => t.name === toolCall.name);
+            const tool = this.tools.get(toolCall.name);
             if (tool) {
+              this.recordLog(logs, "tool", `Calling tool ${toolCall.name}`, {
+                args: toolCall.args,
+              });
               try {
                 const result = await tool.invoke(toolCall.args);
                 messages.push({
@@ -129,9 +160,15 @@ export class AgenticGenerator {
                   tool_call_id: toolCall.id,
                   content: result,
                 });
+                this.recordLog(logs, "tool", `Tool ${toolCall.name} completed`, {
+                  result: this.formatForLog(result),
+                });
               } catch (error) {
                 const errorMsg = error instanceof Error ? error.message : String(error);
                 errors.push(`Tool ${toolCall.name} failed: ${errorMsg}`);
+                this.recordLog(logs, "error", `Tool ${toolCall.name} failed`, {
+                  error: errorMsg,
+                });
                 messages.push({
                   role: "tool",
                   tool_call_id: toolCall.id,
@@ -150,11 +187,15 @@ export class AgenticGenerator {
         if (typeof content === "string") {
           // Try to parse JSON from the response
           const glosses = this.extractGlossesFromResponse(content);
+          this.recordLog(logs, "result", "Agent returned final response", {
+            glossCount: glosses.length,
+          });
           return {
             glosses,
             iterations,
             toolCalls,
             errors,
+            logs,
           };
         }
 
@@ -164,12 +205,17 @@ export class AgenticGenerator {
           content:
             "Please provide your final answer as a JSON object with a 'glosses' array containing the generated understanding challenges.",
         });
+        this.recordLog(logs, "info", "Requested agent to return final answer in JSON format");
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         errors.push(`Iteration ${iterations} failed: ${errorMsg}`);
+        this.recordLog(logs, "error", `Iteration ${iterations} failed`, {
+          error: errorMsg,
+        });
 
         // If too many errors, abort
         if (errors.length >= AI_CONFIG.agentic.maxErrors) {
+          this.recordLog(logs, "error", "Maximum error threshold reached, aborting run");
           break;
         }
       }
@@ -181,12 +227,18 @@ export class AgenticGenerator {
       typeof lastMessage.content === "string"
         ? this.extractGlossesFromResponse(lastMessage.content)
         : [];
+    this.recordLog(logs, "result", "Finished after reaching iteration limit", {
+      glossCount: glosses.length,
+      iterations,
+      toolCalls,
+    });
 
     return {
       glosses,
       iterations,
       toolCalls,
       errors,
+      logs,
     };
   }
 
@@ -260,5 +312,49 @@ Start by analyzing the situation context, then generate appropriate challenges.`
       // Could not extract glosses
       return [];
     }
+  }
+
+  private recordLog(
+    logs: AgenticGenerationLogEntry[],
+    type: AgenticLogType,
+    message: string,
+    details?: unknown
+  ) {
+    logs.push({
+      timestamp: new Date().toISOString(),
+      type,
+      message,
+      details,
+    });
+  }
+
+  private summarizeResponse(content: unknown): string {
+    if (!content) return "";
+    if (typeof content === "string") {
+      return this.truncate(content);
+    }
+    try {
+      return this.truncate(JSON.stringify(content));
+    } catch {
+      return "[unserializable response]";
+    }
+  }
+
+  private formatForLog(value: unknown): string {
+    if (typeof value === "string") {
+      return this.truncate(value);
+    }
+    try {
+      return this.truncate(JSON.stringify(value));
+    } catch {
+      return "[unserializable value]";
+    }
+  }
+
+  private truncate(value: string, limit = 600): string {
+    if (value.length <= limit) {
+      return value;
+    }
+    return `${value.slice(0, limit)}…`;
   }
 }

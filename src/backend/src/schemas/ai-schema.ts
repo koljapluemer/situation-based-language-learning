@@ -9,7 +9,6 @@ export const generateChallengesRequestSchema = z.object({
   situationId: z.string().min(1),
   targetLanguage: languageCodeSchema,
   nativeLanguage: languageCodeSchema,
-  count: z.number().int().min(1).max(10).optional(),
   userHints: z.string().optional(),
 });
 

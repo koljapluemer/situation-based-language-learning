@@ -3,6 +3,7 @@ import { ref, computed } from "vue";
 import { Sparkles, Trash2, AlertCircle } from "lucide-vue-next";
 import type { SituationDTO, LanguageCode } from "@sbl/shared";
 import { useToast } from "../../dumb/toasts/index";
+import ModalAgentRunLog from "./ModalAgentRunLog.vue";
 
 interface GlossPayload {
   content: string;
@@ -14,6 +15,22 @@ interface GlossPayload {
     showBeforeSolution: boolean;
   }>;
   contains?: GlossPayload[];
+}
+
+interface AgentRunLogEntry {
+  timestamp: string;
+  type: "info" | "tool" | "error" | "result";
+  message: string;
+  details?: unknown;
+}
+
+interface AgenticMetadata {
+  mode: "agentic";
+  iterations: number;
+  toolCalls: number;
+  count: number;
+  errors: string[];
+  logs?: AgentRunLogEntry[];
 }
 
 interface Props {
@@ -33,17 +50,18 @@ const toast = useToast();
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3333";
 
 // State
-const mode = ref<"classic" | "agentic">("classic");
-const count = ref(5);
 const userHints = ref("");
 const suggestions = ref<GlossPayload[]>([]);
 const selectedIndices = ref<Set<number>>(new Set());
 const isGenerating = ref(false);
 const isSaving = ref(false);
-const metadata = ref<any>(null);
+const metadata = ref<AgenticMetadata | null>(null);
 const errorMessage = ref<string | null>(null);
+const runLogs = ref<AgentRunLogEntry[]>([]);
+const showLogsModal = ref(false);
 
 const selectedCount = computed(() => selectedIndices.value.size);
+const hasRunLogs = computed(() => runLogs.value.length > 0);
 
 function toggleSelection(index: number) {
   if (selectedIndices.value.has(index)) {
@@ -67,18 +85,15 @@ async function handleGenerate() {
   isGenerating.value = true;
   metadata.value = null;
   errorMessage.value = null;
+  runLogs.value = [];
+  showLogsModal.value = false;
 
   try {
-    const endpoint =
-      mode.value === "classic"
-        ? "/ai/generate-understanding-challenges/classic"
-        : "/ai/generate-understanding-challenges/agentic";
-
+    const endpoint = "/ai/generate-understanding-challenges/agentic";
     const body = {
       situationId: props.situation.id,
       targetLanguage: props.situation.targetLanguage,
       nativeLanguage: props.nativeLanguage,
-      ...(mode.value === "classic" && { count: count.value }),
       userHints: userHints.value || undefined,
     };
 
@@ -103,6 +118,7 @@ async function handleGenerate() {
 
     suggestions.value = result.glosses || [];
     metadata.value = result.metadata;
+    runLogs.value = Array.isArray(result.metadata?.logs) ? result.metadata.logs : [];
 
     // Auto-select all
     selectAll();
@@ -167,6 +183,9 @@ function handleClose() {
   selectedIndices.value = new Set();
   metadata.value = null;
   userHints.value = "";
+  runLogs.value = [];
+  showLogsModal.value = false;
+  errorMessage.value = null;
   emit("close");
 }
 
@@ -210,32 +229,15 @@ function renderContainsTree(contains: GlossPayload[], depth = 0): string {
       <div class="modal-box max-w-4xl">
         <h3 class="mb-6">Generate Understanding Text Challenges</h3>
 
-      <!-- Mode Toggle -->
-      <fieldset class="fieldset">
-        <label class="label">Mode</label>
-        <label class="cursor-pointer flex items-center gap-4">
-          <span>Classic</span>
-          <input
-            type="checkbox"
-            class="toggle toggle-primary"
-            :checked="mode === 'agentic'"
-            @change="mode = mode === 'classic' ? 'agentic' : 'classic'"
-          />
-          <span>Agentic</span>
-        </label>
-      </fieldset>
-
-      <!-- Count (Classic only) -->
-      <fieldset v-if="mode === 'classic'" class="fieldset">
-        <label class="label">How many: {{ count }}</label>
-        <input
-          v-model.number="count"
-          type="range"
-          min="1"
-          max="10"
-          class="range range-primary"
-        />
-      </fieldset>
+        <div class="rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm text-base-content/80 mb-4">
+          <p class="font-medium text-base-content">
+            Agentic generation is enabled for this situation.
+          </p>
+          <p class="mt-1 text-base-content/70">
+            The agent will analyze the situation, explore related glosses, call validation tools, and then suggest challenges.
+            Runs can take a few extra seconds but create richer results and detailed logs.
+          </p>
+        </div>
 
       <!-- User Hints -->
       <fieldset class="fieldset">
@@ -260,16 +262,34 @@ function renderContainsTree(contains: GlossPayload[], depth = 0): string {
         <span v-if="isGenerating" class="loading loading-spinner loading-sm"></span>
       </button>
 
-      <!-- Metadata Display -->
-      <div v-if="metadata" class="alert mt-6">
+      <div v-if="errorMessage" class="alert alert-error mt-4 text-sm">
         <AlertCircle :size="16" />
-        <div>
-          Generated {{ metadata.count }} gloss{{ metadata.count !== 1 ? "es" : "" }}
-          <template v-if="metadata.iterations">
-            in {{ metadata.iterations }} iteration{{ metadata.iterations !== 1 ? "s" : "" }}
-            ({{ metadata.toolCalls }} tool calls)
-          </template>
+        <div>{{ errorMessage }}</div>
+      </div>
+
+      <!-- Metadata Display -->
+      <div v-if="metadata" class="alert mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <AlertCircle :size="16" />
+        <div class="flex-1">
+          <div>
+            Generated {{ metadata.count }} gloss{{ metadata.count !== 1 ? "es" : "" }}
+            <template v-if="metadata.iterations">
+              in {{ metadata.iterations }} iteration{{ metadata.iterations !== 1 ? "s" : "" }}
+              ({{ metadata.toolCalls }} tool calls)
+            </template>
+          </div>
+          <div v-if="metadata.errors?.length" class="text-xs text-base-content/70 mt-1">
+            {{ metadata.errors.length }} error{{ metadata.errors.length === 1 ? "" : "s" }} recorded during the run
+          </div>
         </div>
+        <button
+          v-if="hasRunLogs"
+          class="btn btn-ghost btn-xs"
+          type="button"
+          @click="showLogsModal = true"
+        >
+          View run log
+        </button>
       </div>
 
       <!-- Suggestions Display -->
@@ -358,5 +378,10 @@ function renderContainsTree(contains: GlossPayload[], depth = 0): string {
       <button>close</button>
     </form>
   </dialog>
+  <ModalAgentRunLog
+    :show="showLogsModal"
+    :logs="runLogs"
+    @close="showLogsModal = false"
+  />
   </teleport>
 </template>

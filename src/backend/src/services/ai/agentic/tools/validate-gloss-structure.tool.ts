@@ -23,7 +23,7 @@ export function createValidateGlossStructureTool(glossService: GlossService) {
           return JSON.stringify({
             valid: false,
             error: "Schema validation failed",
-            details: validationResult.error.errors,
+            details: validationResult.error.issues,
           });
         }
 

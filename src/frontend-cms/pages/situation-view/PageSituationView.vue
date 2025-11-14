@@ -360,10 +360,10 @@ function handleGlossChanged() {
                   <div class="card-body p-3">
                     <div class="flex items-start justify-between gap-2">
                       <div class="flex-1">
-                        <GlossTreeNode
+                      <GlossTreeNode
                           :gloss="gloss"
                           :enforce-language="situation.targetLanguage"
-                          :translation-language="selectedNativeLanguage"
+                          :translation-language="situation.nativeLanguage"
                           @changed="handleGlossChanged"
                         />
                       </div>

@@ -13,15 +13,13 @@ export const AI_CONFIG = {
   provider: 'gemini' as 'openai' | 'gemini',
 
   /**
-   * Model configurations for each provider and mode
+   * Model configurations for each provider
    */
   models: {
     openai: {
-      classic: 'gpt-4o-mini',  // Fast, cheap for single-shot generation
       agentic: 'gpt-4o',        // Better reasoning for agentic workflows
     },
     gemini: {
-      classic: 'gemini-2.5-flash',  // Fast, cheap for single-shot generation
       agentic: 'gemini-2.5-pro',     // Better reasoning for agentic workflows
     },
   },
@@ -53,21 +51,5 @@ export const AI_CONFIG = {
      * Prevents infinite loops with failing tool calls
      */
     maxErrors: 10,
-  },
-
-  /**
-   * Classic mode settings
-   */
-  classic: {
-    /**
-     * Default temperature for generation
-     * Higher = more creative, Lower = more deterministic
-     */
-    temperature: 0.7,
-
-    /**
-     * Maximum number of glosses that can be requested per call
-     */
-    maxCount: 10,
   },
 } as const;
