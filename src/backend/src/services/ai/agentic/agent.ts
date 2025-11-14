@@ -11,6 +11,7 @@ import { createSearchExistingGlossesTool } from "./tools/search-existing-glosses
 import { createGetRelatedGlossesTool } from "./tools/get-related-glosses.tool";
 import { createCheckGlossExistsTool } from "./tools/check-gloss-exists.tool";
 import { createAnalyzeSituationTool } from "./tools/analyze-situation.tool";
+import { createAnalyzeGlossStructureTool } from "./tools/analyze-gloss-structure.tool";
 import { createValidateGlossStructureTool } from "./tools/validate-gloss-structure.tool";
 import { createEnsureTranslationsTool } from "./tools/ensure-translations.tool";
 
@@ -44,6 +45,11 @@ export interface AgenticGenerationResult {
   logs: AgenticGenerationLogEntry[];
 }
 
+interface StructureAnalysis {
+  split: boolean;
+  parts: Array<{ content: string }>;
+}
+
 /**
  * Simplified Agentic Generator
  *
@@ -62,6 +68,7 @@ export class AgenticGenerator {
   private readonly situationService: SituationService;
   private readonly glossCreationHelper: GlossCreationHelper;
   private readonly tools: Map<string, StructuredToolInterface>;
+  private readonly structureCache: Map<string, StructureAnalysis>;
 
   constructor(
     glossService?: GlossService,
@@ -78,6 +85,7 @@ export class AgenticGenerator {
     this.glossService = glossService || new GlossService();
     this.situationService = situationService || new SituationService();
     this.glossCreationHelper = new GlossCreationHelper(this.glossService);
+    this.structureCache = new Map();
 
     // Create tools
     const tools = [
@@ -85,6 +93,7 @@ export class AgenticGenerator {
       createGetRelatedGlossesTool(this.glossService),
       createCheckGlossExistsTool(this.glossService),
       createAnalyzeSituationTool(this.situationService),
+      createAnalyzeGlossStructureTool(this.glossService),
       createValidateGlossStructureTool(this.glossService),
       createEnsureTranslationsTool(this.glossService, this.glossCreationHelper),
     ];
@@ -122,6 +131,8 @@ export class AgenticGenerator {
     let toolCalls = 0;
     const errors: string[] = [];
     const logs: AgenticGenerationLogEntry[] = [];
+    let searchFailures = 0;
+    let generationPhase = false;
     this.recordLog(logs, "info", "Starting agentic generation run", {
       situationId: context.situationId,
       targetLanguage: context.targetLanguage,
@@ -139,6 +150,13 @@ export class AgenticGenerator {
       this.recordLog(logs, "info", `Iteration ${iterations} started`);
 
       try {
+        if (!generationPhase && searchFailures >= 3) {
+          generationPhase = true;
+          const nudge = "You've already looked for existing glosses several times without results. Switch to generating new glosses now.";
+          messages.push({ role: "system", content: nudge });
+          this.recordLog(logs, "info", "Switching to generation phase after repeated empty searches");
+        }
+
         const response = await this.agentRunner.invoke(messages);
         messages.push(response);
         const responseSummary = this.summarizeResponse(response.content);
@@ -168,6 +186,16 @@ export class AgenticGenerator {
                 this.recordLog(logs, "tool", `Tool ${toolCall.name} completed`, {
                   result: this.formatForLog(result),
                 });
+                this.captureToolSideEffects(toolCall.name, toolCall.args, result);
+                if (toolCall.name === "searchExistingGlosses") {
+                  const parsed = this.safeParseJSON(result);
+                  const count = typeof parsed?.count === "number" ? parsed.count : 0;
+                  if (count === 0) {
+                    searchFailures++;
+                  } else {
+                    searchFailures = 0;
+                  }
+                }
               } catch (error) {
                 const errorMsg = error instanceof Error ? error.message : String(error);
                 errors.push(`Tool ${toolCall.name} failed: ${errorMsg}`);
@@ -192,16 +220,30 @@ export class AgenticGenerator {
         if (typeof content === "string") {
           // Try to parse JSON from the response
           const glosses = this.extractGlossesFromResponse(content);
-          this.recordLog(logs, "result", "Agent returned final response", {
-            glossCount: glosses.length,
+          const validation = this.validateGlosses(glosses, context);
+          if (validation.valid) {
+            this.recordLog(logs, "result", "Agent returned final response", {
+              glossCount: glosses.length,
+            });
+            return {
+              glosses,
+              iterations,
+              toolCalls,
+              errors,
+              logs,
+            };
+          }
+          messages.push({
+            role: "user",
+            content: validation.feedback,
           });
-          return {
-            glosses,
-            iterations,
-            toolCalls,
-            errors,
+          this.recordLog(
             logs,
-          };
+            "info",
+            "Gloss validation failed, requesting fixes",
+            { issues: validation.issues }
+          );
+          continue;
         }
 
         // If we got here without glosses, ask agent to provide final answer
@@ -258,11 +300,11 @@ Your task is to generate comprehensive understanding text challenges for a langu
 1. Use the analyzeSituationContext tool to understand the situation
 2. Use searchExistingGlosses and checkGlossExists to avoid duplicates
 3. Generate both direct vocabulary (isParaphrased: false) and descriptive glosses (isParaphrased: true)
-4. Split sentences into constituent parts using 'contains' (usually 1 level, deeper for complex structures)
-5. Use getRelatedGlosses to build rich relationships
-6. Every gloss must have at least one translation in ${context.nativeLanguage}. Include translations in your final JSON. When you decide to rely on an existing gloss that lacks translations, call ensureGlossTranslations and provide the translations you want to add.
-7. Aim for comprehensive coverage: basic vocabulary, idioms, variations, related concepts
-8. No strict limit on count - generate until the situation is well-covered (typically 10-20 glosses)
+4. Before splitting any gloss, call analyzeGlossStructure with the gloss content (and glossId when known). Reuse the provided structure or keep the gloss atomic based on the tool result.
+5. When a gloss should be split, build a 'contains' tree (usually 1 level deep) and reuse existing gloss IDs for each part when possible.
+6. Use getRelatedGlosses to build rich relationships beyond contains.
+7. Every gloss must have at least one translation in ${context.nativeLanguage}. When generating brand new glosses, include the translation text directly in your final JSON. Only call ensureGlossTranslations when you have the real database ID of an existing gloss and need to attach missing translations—never call it with placeholder IDs.
+8. Aim for comprehensive coverage: basic vocabulary, idioms, variations, related concepts. No strict limit on count—generate until the situation is well-covered (typically 10-20 glosses).
 
 **Output Format**:
 When done, return a JSON object:
@@ -363,5 +405,87 @@ Start by analyzing the situation context, then generate appropriate challenges.`
       return value;
     }
     return `${value.slice(0, limit)}…`;
+  }
+
+  private safeParseJSON(value: unknown): any {
+    if (typeof value !== "string") return null;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+
+  private captureToolSideEffects(
+    toolName: string,
+    args: any,
+    rawResult: string
+  ) {
+    if (toolName !== "analyzeGlossStructure") {
+      return;
+    }
+
+    const parsed = this.safeParseJSON(rawResult);
+    if (!parsed || parsed.success === false) {
+      return;
+    }
+
+    const key = this.getStructureKey(args?.language, args?.content);
+    if (!key) return;
+
+    const parts = Array.isArray(parsed.parts)
+      ? parsed.parts
+          .filter((part: any) => typeof part?.content === "string" && part.content.trim().length > 0)
+          .map((part: any) => ({ content: part.content.trim() }))
+      : [];
+
+    this.structureCache.set(key, {
+      split: Boolean(parsed.split),
+      parts,
+    });
+  }
+
+  private getStructureKey(language: string | undefined, content: string | undefined) {
+    if (!language || !content) return null;
+    return `${language}:${content.trim()}`;
+  }
+
+  private validateGlosses(
+    glosses: GlossPayload[],
+    context: AgenticGenerationContext
+  ): { valid: true } | { valid: false; feedback: string; issues: string[] } {
+    const issues: string[] = [];
+
+    for (const gloss of glosses) {
+      if (!gloss.translation || gloss.translation.trim().length === 0) {
+        issues.push(`Provide a translation for "${gloss.content}" in ${context.nativeLanguage}.`);
+      }
+
+      const key = this.getStructureKey(context.targetLanguage, gloss.content);
+      if (!key) continue;
+      const structure = this.structureCache.get(key);
+      if (!structure) {
+        issues.push(
+          `Call analyzeGlossStructure for "${gloss.content}" and incorporate its result before finalizing.`
+        );
+        continue;
+      }
+
+      if (structure.split) {
+        if (!gloss.contains || gloss.contains.length === 0) {
+          issues.push(
+            `Add contains entries for "${gloss.content}" based on analyzeGlossStructure suggestions.`
+          );
+        }
+      }
+    }
+
+    if (issues.length === 0) {
+      return { valid: true };
+    }
+
+    const feedback =
+      "Some glosses failed validation:\n- " + issues.map(issue => issue.trim()).join("\n- ");
+    return { valid: false, feedback, issues };
   }
 }

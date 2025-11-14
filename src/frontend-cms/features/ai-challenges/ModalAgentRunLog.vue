@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import { Activity } from "lucide-vue-next";
+import { computed, ref } from "vue";
+import { Activity, Copy, Check } from "lucide-vue-next";
 
 interface AgentRunLogEntry {
   timestamp: string;
@@ -27,6 +27,7 @@ const typeStyles: Record<AgentRunLogEntry["type"], string> = {
 const orderedLogs = computed(() => {
   return [...props.logs].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 });
+const copySuccess = ref(false);
 
 function formatTimestamp(value: string): string {
   const date = new Date(value);
@@ -49,19 +50,58 @@ function formatDetails(details: unknown): string | null {
     return String(details);
   }
 }
+
+function buildMachineReadableLog(): string {
+  try {
+    return JSON.stringify(orderedLogs.value, null, 2);
+  } catch {
+    return JSON.stringify(
+      orderedLogs.value.map(entry => ({
+        timestamp: entry.timestamp,
+        type: entry.type,
+        message: entry.message,
+        details: entry.details,
+      }))
+    );
+  }
+}
+
+async function copyLog() {
+  if (!orderedLogs.value.length) return;
+  try {
+    await navigator.clipboard.writeText(buildMachineReadableLog());
+    copySuccess.value = true;
+    setTimeout(() => (copySuccess.value = false), 2000);
+  } catch {
+    copySuccess.value = false;
+  }
+}
 </script>
 
 <template>
   <dialog :open="show" class="modal modal-bottom sm:modal-middle" @close="emit('close')">
     <div class="modal-box max-w-3xl">
-      <div class="flex items-center gap-3 mb-4">
-        <Activity :size="18" class="text-primary" />
-        <h3 class="text-lg font-semibold">
+      <div class="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex items-center gap-3">
+          <Activity :size="18" class="text-primary" />
+          <h3 class="text-lg font-semibold">
           Agent run log
           <span class="text-sm font-normal text-base-content/60">
             ({{ logs.length }} entr{{ logs.length === 1 ? "y" : "ies" }})
           </span>
         </h3>
+        </div>
+        <button
+          class="btn btn-outline btn-xs sm:btn-sm"
+          type="button"
+          :disabled="!orderedLogs.length"
+          @click="copyLog"
+        >
+          <component :is="copySuccess ? Check : Copy" :size="14" />
+          <span>
+            {{ copySuccess ? "Copied JSON" : "Copy JSON" }}
+          </span>
+        </button>
       </div>
 
       <div v-if="orderedLogs.length === 0" class="text-sm text-base-content/70">

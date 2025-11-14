@@ -17,7 +17,7 @@ const translationPayloadSchema: z.ZodType<GlossPayload> = z.lazy(() =>
 );
 
 const ensureTranslationsSchema = z.object({
-  glossId: z.string().describe("Existing gloss ID to attach translations to"),
+  glossId: z.string().min(1).describe("Existing gloss ID to attach translations to"),
   nativeLanguage: languageCodeSchema.describe(
     "Native language code for translations (e.g., 'eng', 'spa')"
   ),
@@ -36,6 +36,14 @@ export function createEnsureTranslationsTool(
   return tool(
     async ({ glossId, nativeLanguage, translations }: EnsureTranslationsInput) => {
       try {
+        if (!glossId || glossId === "new") {
+          return JSON.stringify({
+            success: false,
+            error:
+              "Cannot ensure translations for a gloss that has not been created yet. Create or reference an existing gloss ID before calling this tool.",
+          });
+        }
+
         const gloss = await glossService.findById(glossId);
 
         if (gloss.language === nativeLanguage) {
