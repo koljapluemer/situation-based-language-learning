@@ -28,13 +28,23 @@ export async function downloadSituationSummaries(
  */
 function collectAllGlossIds(
   gloss: any,
-  collected: Set<string>
+  collected: Set<string>,
+  processed: Set<string>
 ): void {
-  // Avoid cycles
-  if (collected.has(gloss.id)) return;
+  console.log('[collectAllGlossIds] Processing gloss:', gloss.id, gloss.language, gloss.content);
 
-  // Add this gloss ID
-  collected.add(gloss.id);
+  // Add this gloss ID to collection
+  if (!collected.has(gloss.id)) {
+    collected.add(gloss.id);
+    console.log('[collectAllGlossIds] Added gloss ID:', gloss.id);
+  }
+
+  // Avoid processing relations twice (cycle prevention)
+  if (processed.has(gloss.id)) {
+    console.log('[collectAllGlossIds] Already processed relations, skipping');
+    return;
+  }
+  processed.add(gloss.id);
 
   // Collect IDs from all relation arrays (these are GlossReference objects with .id)
   const relations = [
@@ -48,13 +58,19 @@ function collectAllGlossIds(
 
   relations.forEach(relation => {
     if (gloss[relation] && Array.isArray(gloss[relation])) {
+      console.log(`[collectAllGlossIds]   ${relation}:`, gloss[relation].length, gloss[relation]);
       gloss[relation].forEach((ref: any) => {
         if (ref.id && !collected.has(ref.id)) {
+          console.log(`[collectAllGlossIds]     Adding ${relation} ID:`, ref.id);
           collected.add(ref.id);
         }
       });
+    } else {
+      console.log(`[collectAllGlossIds]   ${relation}: not present or not array`);
     }
   });
+
+  console.log('[collectAllGlossIds] Total collected after this gloss:', collected.size);
 }
 
 /**
@@ -76,13 +92,14 @@ export async function downloadSituation(
 
   // Phase 1: Collect all gloss IDs from the situation
   const glossIdsToFetch = new Set<string>();
+  const processedGlossIds = new Set<string>();
 
   situation.challengesOfExpression.forEach(gloss => {
-    collectAllGlossIds(gloss, glossIdsToFetch);
+    collectAllGlossIds(gloss, glossIdsToFetch, processedGlossIds);
   });
 
   situation.challengesOfUnderstandingText.forEach(gloss => {
-    collectAllGlossIds(gloss, glossIdsToFetch);
+    collectAllGlossIds(gloss, glossIdsToFetch, processedGlossIds);
   });
 
   console.log('[downloadSituation] Total gloss IDs to fetch:', glossIdsToFetch.size);
@@ -106,11 +123,14 @@ export async function downloadSituation(
     for (const glossId of idsToFetch) {
       try {
         const gloss = await fetchGloss(glossId);
+        console.log('[downloadSituation] Fetched gloss:', gloss.id, gloss.language, gloss.content);
+        console.log('[downloadSituation]   contains:', gloss.contains?.length || 0);
+        console.log('[downloadSituation]   translations:', gloss.translations?.length || 0);
         allGlosses.push(gloss);
         fetchedIds.add(glossId);
 
         // This gloss might reference more glosses, so collect their IDs too
-        collectAllGlossIds(gloss, glossIdsToFetch);
+        collectAllGlossIds(gloss, glossIdsToFetch, processedGlossIds);
       } catch (error) {
         console.warn('[downloadSituation] Failed to fetch gloss', glossId, error);
       }

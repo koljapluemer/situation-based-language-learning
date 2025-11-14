@@ -136,8 +136,8 @@ export class GlossService {
       select: {
         _count: {
           select: {
-            expressionChallenges: true,
-            understandingChallenges: true,
+            expressionSituations: true,
+            understandingSituations: true,
             containedBy: true,
             synonymousWith: true,
             homophoneOf: true,
@@ -155,8 +155,8 @@ export class GlossService {
 
     const counts = summary._count;
     const totalReferences =
-      counts.expressionChallenges +
-      counts.understandingChallenges +
+      counts.expressionSituations +
+      counts.understandingSituations +
       counts.containedBy +
       counts.synonymousWith +
       counts.homophoneOf +

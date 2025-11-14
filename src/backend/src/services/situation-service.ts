@@ -232,7 +232,56 @@ export class SituationService {
   private async resolveGlossesForSituation(situation: SituationWithRelations) {
     const glossIds = new Set<string>();
     this.collectGlossIds(situation, glossIds);
-    return this.resolver.resolveByIds(Array.from(glossIds));
+
+    // Recursively resolve all dependencies (contains, translations, etc.)
+    const glossMap = new Map<string, GlossDTO>();
+    const toResolve = Array.from(glossIds);
+
+    while (toResolve.length > 0) {
+      const batch = toResolve.splice(0, toResolve.length);
+      const resolvedBatch = await this.resolver.resolveByIds(batch);
+
+      // Add newly resolved glosses to map
+      resolvedBatch.forEach((gloss, id) => {
+        if (!glossMap.has(id)) {
+          glossMap.set(id, gloss);
+
+          // Collect IDs from all relations
+          gloss.contains.forEach((ref) => {
+            if (!glossMap.has(ref.id)) {
+              toResolve.push(ref.id);
+            }
+          });
+          gloss.translations.forEach((ref) => {
+            if (!glossMap.has(ref.id)) {
+              toResolve.push(ref.id);
+            }
+          });
+          gloss.nearSynonyms.forEach((ref) => {
+            if (!glossMap.has(ref.id)) {
+              toResolve.push(ref.id);
+            }
+          });
+          gloss.nearHomophones.forEach((ref) => {
+            if (!glossMap.has(ref.id)) {
+              toResolve.push(ref.id);
+            }
+          });
+          gloss.clarifiesUsage.forEach((ref) => {
+            if (!glossMap.has(ref.id)) {
+              toResolve.push(ref.id);
+            }
+          });
+          gloss.toBeDifferentiatedFrom.forEach((ref) => {
+            if (!glossMap.has(ref.id)) {
+              toResolve.push(ref.id);
+            }
+          });
+        }
+      });
+    }
+
+    return glossMap;
   }
 
   private parseDescriptions(descriptions: Prisma.JsonValue): LocalizedString[] {

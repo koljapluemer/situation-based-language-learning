@@ -110,6 +110,22 @@ async function handleDownloadSituation(identifier: string) {
   }
 }
 
+// Practice: download if needed, then start
+async function handlePractice(identifier: string) {
+  // Download if not already downloaded
+  if (!downloadedSituations.value.has(identifier)) {
+    await handleDownloadSituation(identifier);
+
+    // Check if download failed
+    if (error.value) {
+      return;
+    }
+  }
+
+  // Navigate to practice
+  router.push({ name: 'practice-understanding-text', params: { situationId: identifier } });
+}
+
 // Download all situations for current language
 async function handleDownloadAll() {
   downloadingAll.value = true;
@@ -210,29 +226,26 @@ watch(situations, () => {
             {{ getTotalChallenges(situation) }} challenge{{ getTotalChallenges(situation) !== 1 ? 's' : '' }}
           </p>
           <div class="card-actions justify-end gap-2">
+            <!-- Re-download button (only if already downloaded) -->
             <button
-              v-if="!downloadedSituations.has(situation.identifier)"
+              v-if="downloadedSituations.has(situation.identifier)"
               @click="handleDownloadSituation(situation.identifier)"
               :disabled="downloadingIdentifier === situation.identifier"
-              class="btn btn-ghost btn-sm gap-1"
-              title="Download for offline use"
+              class="btn btn-ghost btn-sm btn-square"
+              title="Re-download"
             >
-              <Download :size="14" />
-              <span v-if="downloadingIdentifier !== situation.identifier">Download</span>
+              <Download :size="16" v-if="downloadingIdentifier !== situation.identifier" />
               <span v-else class="loading loading-spinner loading-xs"></span>
             </button>
-            <span
-              v-else
-              class="badge badge-success badge-sm gap-1"
-              title="Available offline"
-            >
-              Downloaded
-            </span>
+
+            <!-- Practice button (downloads if needed, then starts) -->
             <button
-              @click="router.push({ name: 'practice-understanding-text', params: { situationId: situation.identifier } })"
+              @click="handlePractice(situation.identifier)"
+              :disabled="downloadingIdentifier === situation.identifier"
               class="btn btn-primary btn-sm"
             >
-              Start
+              <span v-if="downloadingIdentifier !== situation.identifier">Practice</span>
+              <span v-else class="loading loading-spinner loading-xs"></span>
             </button>
           </div>
         </div>

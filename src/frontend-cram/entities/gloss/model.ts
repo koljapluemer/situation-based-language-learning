@@ -7,7 +7,7 @@ import * as ebisu from 'ebisu-js';
  * Transform GlossDTO from API to GlossEntity for local storage
  */
 export function fromDTO(dto: GlossDTO): GlossEntity {
-  return {
+  const entity = {
     id: dto.id,
     language: dto.language,
     content: dto.content,
@@ -23,6 +23,12 @@ export function fromDTO(dto: GlossDTO): GlossEntity {
     lastSyncedAt: new Date(),
     updatedAt: new Date(),
   };
+
+  console.log('[fromDTO] Converting:', dto.id, dto.language, dto.content);
+  console.log('[fromDTO]   DTO translations:', dto.translations?.length || 0, dto.translations);
+  console.log('[fromDTO]   Entity translationIds:', entity.translationIds.length, entity.translationIds);
+
+  return entity;
 }
 
 /**

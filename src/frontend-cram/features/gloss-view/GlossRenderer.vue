@@ -161,9 +161,19 @@ const getTranslationSpecificNotes = (translation: GlossEntity): Note[] => {
 };
 
 onMounted(async () => {
+  console.log('[GlossRenderer] Mounting for gloss:', props.gloss.id, props.gloss.content);
+  console.log('[GlossRenderer] translationIds:', props.gloss.translationIds);
+  console.log('[GlossRenderer] hideTranslations:', props.hideTranslations);
+
   // Load translations
   if (props.gloss.translationIds && props.gloss.translationIds.length > 0) {
     resolvedTranslations.value = await getGlossesByIds(props.gloss.translationIds);
+    console.log('[GlossRenderer] Resolved translations:', resolvedTranslations.value.length);
+    resolvedTranslations.value.forEach(t => {
+      console.log('[GlossRenderer]   Translation:', t.id, t.language, t.content);
+    });
+  } else {
+    console.log('[GlossRenderer] No translation IDs to load');
   }
 });
 </script>
