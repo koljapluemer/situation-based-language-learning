@@ -1,7 +1,7 @@
 import { LanguageCode } from "@sbl/shared";
 import { GlossService } from "../gloss-service";
 import { GlossPayload } from "../../schemas/ai-schema";
-import { GlossWriteInput } from "../../schemas/gloss-schema";
+import { GlossWriteInput, GlossUpdateInput } from "../../schemas/gloss-schema";
 
 /**
  * Helper service for creating glosses with recursive contains relationships
@@ -34,12 +34,8 @@ export class GlossCreationHelper {
     payload: GlossPayload,
     language: LanguageCode
   ): Promise<string> {
-    // Check if this gloss already exists
     const existingGlosses = await this.glossService.list(language, payload.content);
-    if (existingGlosses.length > 0) {
-      // Gloss already exists, return its ID
-      return existingGlosses[0].id;
-    }
+    const existingGloss = existingGlosses[0];
 
     // Process contains recursively (depth-first)
     const containsIds: string[] = [];
@@ -49,25 +45,88 @@ export class GlossCreationHelper {
         containsIds.push(childId);
       }
     }
+    const uniqueContainsIds = this.uniqueIds(containsIds);
 
-    // Prepare the write input for GlossService
-    const writeInput: GlossWriteInput = {
-      language,
-      content: payload.content,
-      isParaphrased: payload.isParaphrased ?? false,
-      transcriptions: payload.transcriptions ?? [],
-      notes: payload.notes ?? [],
-      containsIds,
-      translationIds: payload.translationIds ?? [],
-      nearSynonymIds: payload.nearSynonymIds ?? [],
-      nearHomophoneIds: payload.nearHomophoneIds ?? [],
-      clarifiesUsageIds: payload.clarifiesUsageIds ?? [],
-      toBeDifferentiatedFromIds: payload.toBeDifferentiatedFromIds ?? [],
-    };
+    if (!existingGloss) {
+      // Prepare the write input for GlossService
+      const writeInput: GlossWriteInput = {
+        language,
+        content: payload.content,
+        isParaphrased: payload.isParaphrased ?? false,
+        transcriptions: payload.transcriptions ?? [],
+        notes: payload.notes ?? [],
+        containsIds: uniqueContainsIds,
+        translationIds: payload.translationIds ?? [],
+        nearSynonymIds: payload.nearSynonymIds ?? [],
+        nearHomophoneIds: payload.nearHomophoneIds ?? [],
+        clarifiesUsageIds: payload.clarifiesUsageIds ?? [],
+        toBeDifferentiatedFromIds: payload.toBeDifferentiatedFromIds ?? [],
+      };
 
-    // Create the gloss
-    const createdGloss = await this.glossService.create(writeInput);
-    return createdGloss.id;
+      const createdGloss = await this.glossService.create(writeInput);
+      return createdGloss.id;
+    }
+
+    const updatePayload: GlossUpdateInput = {};
+    let needsUpdate = false;
+
+    const existingContainsIds = this.extractIds(existingGloss.contains);
+    const mergedContains = this.mergeIds(existingContainsIds, uniqueContainsIds);
+    if (mergedContains) {
+      updatePayload.containsIds = mergedContains;
+      needsUpdate = true;
+    }
+
+    const relationMerges: Array<{
+      field:
+        | "translationIds"
+        | "nearSynonymIds"
+        | "nearHomophoneIds"
+        | "clarifiesUsageIds"
+        | "toBeDifferentiatedFromIds";
+      existing: string[];
+      incoming: string[];
+    }> = [
+      {
+        field: "translationIds",
+        existing: this.extractIds(existingGloss.translations),
+        incoming: payload.translationIds ?? [],
+      },
+      {
+        field: "nearSynonymIds",
+        existing: this.extractIds(existingGloss.nearSynonyms),
+        incoming: payload.nearSynonymIds ?? [],
+      },
+      {
+        field: "nearHomophoneIds",
+        existing: this.extractIds(existingGloss.nearHomophones),
+        incoming: payload.nearHomophoneIds ?? [],
+      },
+      {
+        field: "clarifiesUsageIds",
+        existing: this.extractIds(existingGloss.clarifiesUsage),
+        incoming: payload.clarifiesUsageIds ?? [],
+      },
+      {
+        field: "toBeDifferentiatedFromIds",
+        existing: this.extractIds(existingGloss.toBeDifferentiatedFrom),
+        incoming: payload.toBeDifferentiatedFromIds ?? [],
+      },
+    ];
+
+    for (const relation of relationMerges) {
+      const merged = this.mergeIds(relation.existing, relation.incoming);
+      if (merged) {
+        updatePayload[relation.field] = merged;
+        needsUpdate = true;
+      }
+    }
+
+    if (needsUpdate) {
+      await this.glossService.update(existingGloss.id, updatePayload);
+    }
+
+    return existingGloss.id;
   }
 
   /**
@@ -149,13 +208,9 @@ export class GlossCreationHelper {
     targetLanguage: LanguageCode,
     nativeLanguage: LanguageCode
   ): Promise<string> {
-    // Check if this gloss already exists
     const existingGlosses = await this.glossService.list(targetLanguage, payload.content);
-    if (existingGlosses.length > 0) {
-      return existingGlosses[0].id;
-    }
+    const existingGloss = existingGlosses[0];
 
-    // Step 1: Create translation gloss if translation content provided
     let translationId: string | undefined;
     if (payload.translation) {
       // Build translation payload (mirror structure for contains if present)
@@ -192,25 +247,94 @@ export class GlossCreationHelper {
         containsIds.push(childId);
       }
     }
+    const uniqueContainsIds = this.uniqueIds(containsIds);
 
-    // Step 3: Prepare the write input for the main gloss
-    const writeInput: GlossWriteInput = {
-      language: targetLanguage,
-      content: payload.content,
-      isParaphrased: payload.isParaphrased ?? false,
-      transcriptions: payload.transcriptions ?? [],
-      notes: payload.notes ?? [],
-      containsIds,
-      translationIds: translationId ? [translationId] : [],
-      nearSynonymIds: payload.nearSynonymIds ?? [],
-      nearHomophoneIds: payload.nearHomophoneIds ?? [],
-      clarifiesUsageIds: payload.clarifiesUsageIds ?? [],
-      toBeDifferentiatedFromIds: payload.toBeDifferentiatedFromIds ?? [],
-    };
+    // Step 3: Prepare the write/update input for the main gloss
+    const translationIds = this.uniqueIds([
+      ...(payload.translationIds ?? []),
+      ...(translationId ? [translationId] : []),
+    ]);
 
-    // Step 4: Create the main gloss
-    const createdGloss = await this.glossService.create(writeInput);
-    return createdGloss.id;
+    if (!existingGloss) {
+      const writeInput: GlossWriteInput = {
+        language: targetLanguage,
+        content: payload.content,
+        isParaphrased: payload.isParaphrased ?? false,
+        transcriptions: payload.transcriptions ?? [],
+        notes: payload.notes ?? [],
+        containsIds: uniqueContainsIds,
+        translationIds,
+        nearSynonymIds: payload.nearSynonymIds ?? [],
+        nearHomophoneIds: payload.nearHomophoneIds ?? [],
+        clarifiesUsageIds: payload.clarifiesUsageIds ?? [],
+        toBeDifferentiatedFromIds: payload.toBeDifferentiatedFromIds ?? [],
+      };
+
+      const createdGloss = await this.glossService.create(writeInput);
+      return createdGloss.id;
+    }
+
+    const updatePayload: GlossUpdateInput = {};
+    let needsUpdate = false;
+
+    const existingContainsIds = this.extractIds(existingGloss.contains);
+    const mergedContains = this.mergeIds(existingContainsIds, uniqueContainsIds);
+    if (mergedContains) {
+      updatePayload.containsIds = mergedContains;
+      needsUpdate = true;
+    }
+
+    const existingTranslationIds = this.extractIds(existingGloss.translations);
+    const mergedTranslations = this.mergeIds(existingTranslationIds, translationIds);
+    if (mergedTranslations) {
+      updatePayload.translationIds = mergedTranslations;
+      needsUpdate = true;
+    }
+
+    const relationMerges: Array<{
+      field:
+        | "nearSynonymIds"
+        | "nearHomophoneIds"
+        | "clarifiesUsageIds"
+        | "toBeDifferentiatedFromIds";
+      existing: string[];
+      incoming: string[];
+    }> = [
+      {
+        field: "nearSynonymIds",
+        existing: this.extractIds(existingGloss.nearSynonyms),
+        incoming: payload.nearSynonymIds ?? [],
+      },
+      {
+        field: "nearHomophoneIds",
+        existing: this.extractIds(existingGloss.nearHomophones),
+        incoming: payload.nearHomophoneIds ?? [],
+      },
+      {
+        field: "clarifiesUsageIds",
+        existing: this.extractIds(existingGloss.clarifiesUsage),
+        incoming: payload.clarifiesUsageIds ?? [],
+      },
+      {
+        field: "toBeDifferentiatedFromIds",
+        existing: this.extractIds(existingGloss.toBeDifferentiatedFrom),
+        incoming: payload.toBeDifferentiatedFromIds ?? [],
+      },
+    ];
+
+    for (const relation of relationMerges) {
+      const merged = this.mergeIds(relation.existing, relation.incoming);
+      if (merged) {
+        updatePayload[relation.field] = merged;
+        needsUpdate = true;
+      }
+    }
+
+    if (needsUpdate) {
+      await this.glossService.update(existingGloss.id, updatePayload);
+    }
+
+    return existingGloss.id;
   }
 
   /**
@@ -238,5 +362,24 @@ export class GlossCreationHelper {
     }
 
     return glossIds;
+  }
+
+  private extractIds(items?: Array<{ id: string }>): string[] {
+    return items?.map(item => item.id) ?? [];
+  }
+
+  private mergeIds(existing: string[], incoming: string[]): string[] | null {
+    if (!incoming.length) {
+      return null;
+    }
+    const additions = incoming.filter(id => !existing.includes(id));
+    if (!additions.length) {
+      return null;
+    }
+    return [...existing, ...additions];
+  }
+
+  private uniqueIds(ids: string[]): string[] {
+    return Array.from(new Set(ids));
   }
 }
