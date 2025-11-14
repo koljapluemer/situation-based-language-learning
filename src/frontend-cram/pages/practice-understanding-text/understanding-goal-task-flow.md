@@ -22,9 +22,16 @@ The system practices **only the dependency glosses**, not the challenge glosses 
 **Selection Logic** (`selectNextGloss`):
 1. **Exclude challenge glosses** - These are reserved for the final test
 2. **Exclude last practiced gloss** - Prevents immediate repetition
-3. **Check recall threshold** - Skip if recall e 0.95
-4. **Check dependencies** - Only practice if all `containsIds` have recall e 0.8
+3. **Check recall threshold** - Skip if recall â‰¥ 0.95 UNLESS gloss needs reveal task (see below)
+4. **Check dependencies** - Only practice if all `containsIds` have recall â‰¥ 0.8
 5. **Randomize** - Pick random gloss from eligible set using `Math.random()`
+
+**New Gloss Guarantee** (`glossesNeedingReveal`):
+- Tracks glosses that were new at lesson start (no `progressEbisu`)
+- These glosses MUST complete at least one `reveal` task before being excluded by high recall
+- Ensures every new gloss gets real spaced-repetition practice with rating feedback
+- Removed from tracking set after completing a `reveal` task
+- Prevents glosses from only appearing once as `try-to-remember` then disappearing
 
 **Task Type Selection** (`generateNextTask`):
 - **If no `progressEbisu`**: Use `task-gloss-try-to-remember` (first exposure)
@@ -61,31 +68,33 @@ After completing the final challenge, shows completion screen with:
 
 ```
 For each gloss:
-  If it has no contains ’ dependencies met
+  If it has no contains ï¿½ dependencies met
   For each containsId:
-    If gloss not loaded ’ dependencies not met
-    If recall < 0.8 ’ dependencies not met
-  All checks passed ’ dependencies met
+    If gloss not loaded ï¿½ dependencies not met
+    If recall < 0.8 ï¿½ dependencies not met
+  All checks passed ï¿½ dependencies met
 ```
 
-**Example**: To practice "¿Cómo estás?" you must first practice "cómo" and "estás" until they reach 0.8 recall.
+**Example**: To practice "ï¿½Cï¿½mo estï¿½s?" you must first practice "cï¿½mo" and "estï¿½s" until they reach 0.8 recall.
 
 ### Readiness Check (`allGlossesReady`)
 
 ```
-If no challenge glosses ’ not ready
-For each challenge gloss:
-  If gloss not loaded ’ not ready
-  If recall < 0.95 ’ not ready
-All checks passed ’ ready for final challenge
+If no challenge glosses â†’ not ready
+For each non-challenge gloss (dependencies):
+  If recall < 0.95 â†’ not ready
+All checks passed â†’ ready for final challenge
 ```
+
+**Note**: Challenge glosses themselves are NOT checked for recall, since they're excluded from normal practice and only appear in the final test.
 
 ### Progress Updates (`handleTaskFinished`)
 
 1. **Reload practiced gloss** from Dexie (gets updated `progressEbisu`)
 2. **Update Map** with fresh gloss data
-3. **Check if final challenge** - If yes and all ready, mark complete
-4. **Generate next task** - Continue practice flow
+3. **Track reveal completion** - If task was `gloss-reveal`, remove gloss from `glossesNeedingReveal`
+4. **Check if final challenge** - If yes and all ready, mark complete
+5. **Generate next task** - Continue practice flow
 
 ## Ebisu Integration
 
@@ -105,25 +114,28 @@ recall = ebisu.predictRecall(model, hoursSinceReview, true)
 ### Model Updates
 - **Initial**: `[3, 3, 24]` (uncertain, 24-hour half-life)
 - **After rating**: `ebisu.updateRecall(model, successProb, 1, hoursSinceReview)`
-  - Rating 1 ’ 0.2 success probability
-  - Rating 2 ’ 0.4 success probability
-  - Rating 3 ’ 0.7 success probability
-  - Rating 4 ’ 0.95 success probability
+  - Rating 1 ï¿½ 0.2 success probability
+  - Rating 2 ï¿½ 0.4 success probability
+  - Rating 3 ï¿½ 0.7 success probability
+  - Rating 4 ï¿½ 0.95 success probability
 
 ## Example Flow
 
-**Situation**: "Greeting a friend" with challenge gloss "¿Cómo estás?"
-- Contains: ["¿Cómo", "estás", "?"]
+**Situation**: "Greeting a friend" with challenge gloss "ï¿½Cï¿½mo estï¿½s?"
+- Contains: ["ï¿½Cï¿½mo", "estï¿½s", "?"]
 
 **Practice Sequence**:
-1. **Try to Remember**: "¿Cómo" (no dependencies)
-2. **Try to Remember**: "estás" (no dependencies)
-3. **Try to Remember**: "?" (no dependencies)
-4. *User practices these until recall e 0.95*
-5. **Reveal tasks**: Continue practicing components with ratings
-6. **All components reach 0.95 recall**
-7. **Final Challenge**: "¿Cómo estás?" (guess what it means)
-8. **Complete**
+1. **Try to Remember**: "Â¿CÃ³mo" (no dependencies, first exposure)
+2. **Try to Remember**: "estÃ¡s" (no dependencies, first exposure)
+3. **Try to Remember**: "?" (no dependencies, first exposure)
+4. **Reveal**: "Â¿CÃ³mo" (guaranteed reveal task, user rates difficulty)
+5. **Reveal**: "estÃ¡s" (guaranteed reveal task, user rates difficulty)
+6. **Reveal**: "?" (guaranteed reveal task, user rates difficulty)
+7. *Continue reveal tasks until all components reach recall â‰¥ 0.95*
+8. **Final Challenge**: "Â¿CÃ³mo estÃ¡s?" (guess what it means)
+9. **Complete**
+
+**Note**: Each new gloss appears at least twice - once as try-to-remember, then at least once as reveal. This ensures proper spaced repetition with rating feedback.
 
 ## State Management
 
@@ -133,9 +145,10 @@ recall = ebisu.predictRecall(model, hoursSinceReview, true)
 - `currentTask`: Current task being practiced
 - `lastPracticedGlossId`: Prevents immediate repetition
 - `isComplete`: Practice session finished
+- `glossesNeedingReveal`: Set of gloss IDs that need at least one reveal task
 
 ### Computed
-- `allGlossesReady`: All challenge glosses have recall e 0.95
+- `allGlossesReady`: All non-challenge glosses (dependencies) have recall â‰¥ 0.95
 
 ## Error Handling
 
@@ -146,7 +159,7 @@ recall = ebisu.predictRecall(model, hoursSinceReview, true)
 
 ## Exit Points
 
-1. **Exit button** in task instruction bar ’ Back to situations
-2. **Go Back** button in error state ’ Back to situations
+1. **Exit button** in task instruction bar ï¿½ Back to situations
+2. **Go Back** button in error state ï¿½ Back to situations
 3. **Back to Situations** button in completion screen
-4. **Practice Again** button ’ Resets state, regenerates first task
+4. **Practice Again** button ï¿½ Resets state, regenerates first task

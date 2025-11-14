@@ -29,6 +29,7 @@ const error = ref<string | null>(null);
 const currentTask = ref<Task | null>(null);
 const lastPracticedGlossId = ref<string | null>(null);
 const isComplete = ref(false);
+const glossesNeedingReveal = ref<Set<string>>(new Set());
 
 // Computed: Check if all dependency glosses are ready (recall > 0.95)
 // Note: We check dependencies, not the challenge glosses themselves,
@@ -36,6 +37,9 @@ const isComplete = ref(false);
 const allGlossesReady = computed(() => {
   // If no challenge glosses, not ready
   if (challengeGlossIds.value.length === 0) return false;
+
+  // If any glosses still need reveal tasks, not ready
+  if (glossesNeedingReveal.value.size > 0) return false;
 
   // Check all non-challenge glosses (dependencies)
   for (const gloss of allGlosses.value.values()) {
@@ -98,17 +102,24 @@ function selectNextGloss(): GlossEntity | null {
 
   // Find all glosses that need practice and have dependencies met
   for (const gloss of allGlosses.value.values()) {
+    const recall = getRecallProbability(gloss);
+    const isChallenge = challengeGlossIds.value.includes(gloss.id!);
+    const isLastPracticed = gloss.id === lastPracticedGlossId.value;
+    const recallTooHigh = recall >= 0.95;
+    const needsReveal = glossesNeedingReveal.value.has(gloss.id!);
+    const depsMet = areDependenciesMet(gloss);
+
     // Skip if this is a challenge gloss (they're only for the final test)
-    if (challengeGlossIds.value.includes(gloss.id!)) continue;
+    if (isChallenge) continue;
 
     // Skip if this was the last practiced gloss
-    if (gloss.id === lastPracticedGlossId.value) continue;
+    if (isLastPracticed) continue;
 
-    // Skip if recall is already high enough
-    if (getRecallProbability(gloss) >= 0.95) continue;
+    // Skip if recall is already high enough (unless it still needs a reveal task)
+    if (recallTooHigh && !needsReveal) continue;
 
     // Check if dependencies are met
-    if (!areDependenciesMet(gloss)) continue;
+    if (!depsMet) continue;
 
     eligibleGlosses.push(gloss);
   }
@@ -124,15 +135,8 @@ function selectNextGloss(): GlossEntity | null {
  * Generate next task based on current state
  */
 async function generateNextTask() {
-  console.log('[generateNextTask] Starting', {
-    allGlossesReady: allGlossesReady.value,
-    challengeGlossCount: challengeGlossIds.value.length,
-    totalGlossCount: allGlosses.value.size
-  });
-
   // If all glosses are ready, present final challenge
   if (allGlossesReady.value) {
-    console.log('[generateNextTask] All glosses ready, presenting final challenge');
     // Pick a random challenge gloss for the final test
     const randomIndex = Math.floor(Math.random() * challengeGlossIds.value.length);
     const challengeGlossId = challengeGlossIds.value[randomIndex];
@@ -146,12 +150,10 @@ async function generateNextTask() {
 
   // Select next gloss to practice
   const nextGloss = selectNextGloss();
-  console.log('[generateNextTask] Selected next gloss:', nextGloss?.id, nextGloss?.content);
 
   if (!nextGloss) {
     // No more glosses to practice but not all are ready - should not happen
     // but handle gracefully
-    console.log('[generateNextTask] No eligible glosses found, marking complete');
     isComplete.value = true;
     return;
   }
@@ -159,11 +161,17 @@ async function generateNextTask() {
   // Determine which task type to use
   if (!nextGloss.progressEbisu) {
     // First time seeing this gloss
-    console.log('[generateNextTask] First time - try to remember');
+    console.log('[NEW GLOSS]', nextGloss.id, nextGloss.content, '- try-to-remember (adding to needsReveal tracking)');
     currentTask.value = generateGlossTryToRemember(nextGloss);
   } else {
     // Already seen, use reveal task
-    console.log('[generateNextTask] Already seen - reveal task');
+    const needsReveal = glossesNeedingReveal.value.has(nextGloss.id!);
+    const recall = getRecallProbability(nextGloss);
+    console.log('[REPEAT GLOSS]', nextGloss.id, nextGloss.content, '- reveal task', {
+      recall: recall.toFixed(3),
+      needsReveal,
+      stillTracked: needsReveal ? 'YES (will be removed after this reveal)' : 'NO'
+    });
     currentTask.value = generateGlossReveal(nextGloss);
   }
 
@@ -179,6 +187,15 @@ async function handleTaskFinished() {
     const updatedGloss = await getGloss(lastPracticedGlossId.value);
     if (updatedGloss) {
       allGlosses.value.set(updatedGloss.id!, updatedGloss);
+    }
+
+    // If this was a reveal task, remove from glossesNeedingReveal
+    if (currentTask.value?.taskType === 'gloss-reveal') {
+      const wasTracked = glossesNeedingReveal.value.has(lastPracticedGlossId.value);
+      glossesNeedingReveal.value.delete(lastPracticedGlossId.value);
+      if (wasTracked) {
+        console.log('[REVEAL COMPLETED]', lastPracticedGlossId.value, '- removed from tracking. Remaining:', glossesNeedingReveal.value.size);
+      }
     }
   }
 
@@ -206,6 +223,15 @@ function goBack() {
 function restartPractice() {
   isComplete.value = false;
   lastPracticedGlossId.value = null;
+  glossesNeedingReveal.value.clear();
+
+  // Re-populate glossesNeedingReveal for glosses that still have no progress
+  for (const gloss of allGlosses.value.values()) {
+    if (!gloss.progressEbisu && !challengeGlossIds.value.includes(gloss.id!)) {
+      glossesNeedingReveal.value.add(gloss.id!);
+    }
+  }
+
   generateNextTask();
 }
 
@@ -216,8 +242,6 @@ onMounted(async () => {
 
     // Fetch situation from Dexie
     const situation = await getSituation(situationId);
-
-    console.log('[onMounted] Loaded situation:', JSON.stringify(situation, null, 2));
 
     if (!situation) {
       error.value = `Situation "${situationId}" not found. Please download it first.`;
@@ -234,24 +258,28 @@ onMounted(async () => {
     }
 
     challengeGlossIds.value = situation.challengesOfUnderstandingTextIds;
-    console.log('[onMounted] Challenge gloss IDs:', challengeGlossIds.value);
 
     // Recursively collect all glosses including dependencies
     const allGlossIdsSet = await collectAllGlossIds(challengeGlossIds.value);
     const allGlossIdArray = Array.from(allGlossIdsSet);
-    console.log('[onMounted] All gloss IDs (including dependencies):', allGlossIdArray);
 
     // Load all glosses
     const loadedGlosses = await getGlossesByIds(allGlossIdArray);
-    console.log('[onMounted] Loaded glosses count:', loadedGlosses.length);
 
-    // Store in map for easy lookup
+    // Store in map for easy lookup and track new glosses
     for (const gloss of loadedGlosses) {
       if (gloss.id) {
         allGlosses.value.set(gloss.id, gloss);
-        console.log('[onMounted] Gloss:', gloss.id, gloss.content, 'progressEbisu:', gloss.progressEbisu);
+
+        // Track glosses that are new (no progress yet) and not challenge glosses
+        if (!gloss.progressEbisu && !challengeGlossIds.value.includes(gloss.id)) {
+          glossesNeedingReveal.value.add(gloss.id);
+          console.log('[TRACKING NEW GLOSS]', gloss.id, gloss.content, '- needs reveal task');
+        }
       }
     }
+
+    console.log('[onMounted] Total glosses needing reveal:', glossesNeedingReveal.value.size);
 
     if (allGlosses.value.size === 0) {
       error.value = 'This situation has no glosses to practice.';
