@@ -75,7 +75,7 @@ async function handleGenerate() {
         : "/ai/generate-understanding-challenges/agentic";
 
     const body = {
-      situationId: props.situation.identifier,
+      situationId: props.situation.id,
       targetLanguage: props.situation.targetLanguage,
       nativeLanguage: props.nativeLanguage,
       ...(mode.value === "classic" && { count: count.value }),
@@ -133,11 +133,11 @@ async function handleSave() {
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/situations/${props.situation.identifier}/save-generated-challenges`,
+      `${API_BASE_URL}/situations/${props.situation.id}/save-generated-challenges`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ selectedGlosses: selected }),
+        body: JSON.stringify({ selectedGlosses: selected, nativeLanguage: props.nativeLanguage }),
       }
     );
 

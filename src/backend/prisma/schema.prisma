@@ -11,10 +11,11 @@ datasource db {
 // This allows a single source of truth for language definitions
 
 model Situation {
-  identifier String  @id  // Human-readable identifier serves as primary key (e.g., "greeting-basic")
+  id String @id @default(cuid())
   descriptions Json
   imageLink String?
   targetLanguage String  // Validated against LANGUAGES in @sbl/shared - the language being learned
+  nativeLanguage String  // Validated against LANGUAGES in @sbl/shared - learner's native language
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -6,7 +6,7 @@
 
 ## Data Loading (onMounted)
 
-1. **Fetch Situation**: Load situation from Dexie by identifier
+1. **Fetch Situation**: Load situation from Dexie by id
 2. **Extract Challenge Glosses**: Get `challengesOfUnderstandingTextIds` array (main texts to understand)
 3. **Collect All Dependencies**: Recursively collect all gloss IDs including:
    - Challenge glosses

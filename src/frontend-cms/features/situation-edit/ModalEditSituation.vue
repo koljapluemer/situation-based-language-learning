@@ -6,10 +6,9 @@ import { useModalEditSituation } from "./index";
 const { isOpen, currentSituation, close } = useModalEditSituation();
 
 const emit = defineEmits<{
-  update: [identifier: string, descriptions: LocalizedString[], imageLink?: string];
+  update: [descriptions: LocalizedString[], imageLink?: string];
 }>();
 
-const identifier = ref("");
 const descriptions = ref<LocalizedString[]>([]);
 const imageLink = ref("");
 const isSubmitting = ref(false);
@@ -17,18 +16,17 @@ const isSubmitting = ref(false);
 // Watch for situation changes and populate form
 watch(currentSituation, (situation) => {
   if (situation) {
-    identifier.value = situation.identifier;
     descriptions.value = [...situation.descriptions];
     imageLink.value = situation.imageLink ?? "";
   }
 });
 
 function handleSubmit() {
-  if (!identifier.value.trim() || descriptions.value.length === 0) return;
+  if (descriptions.value.length === 0) return;
 
   isSubmitting.value = true;
   const imageLinkValue = imageLink.value.trim() || undefined;
-  emit("update", identifier.value, descriptions.value, imageLinkValue);
+  emit("update", descriptions.value, imageLinkValue);
 }
 
 function handleClose() {
@@ -38,7 +36,6 @@ function handleClose() {
 }
 
 function resetForm() {
-  identifier.value = "";
   descriptions.value = [];
   imageLink.value = "";
   isSubmitting.value = false;
@@ -71,19 +68,6 @@ function handleModalClose() {
         <h2>Edit Situation</h2>
 
         <form @submit.prevent="handleSubmit" class="space-y-4">
-          <fieldset class="fieldset">
-            <label for="identifier" class="label">Identifier</label>
-            <input
-              id="identifier"
-              v-model="identifier"
-              type="text"
-              class="input"
-              placeholder="greeting-basic"
-              required
-              :disabled="isSubmitting"
-            />
-          </fieldset>
-
           <fieldset class="fieldset">
             <label class="label">Descriptions</label>
             <div class="space-y-2">
@@ -156,7 +140,7 @@ function handleModalClose() {
             <button
               type="submit"
               class="btn btn-primary"
-              :disabled="!identifier.trim() || descriptions.length === 0 || isSubmitting"
+              :disabled="descriptions.length === 0 || isSubmitting"
             >
               <span v-if="isSubmitting" class="loading loading-spinner loading-sm"></span>
               {{ isSubmitting ? "Saving..." : "Save Changes" }}

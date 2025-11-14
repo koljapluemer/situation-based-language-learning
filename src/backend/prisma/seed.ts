@@ -86,16 +86,17 @@ async function main() {
 
   // Create situation with direct gloss connections
   await prisma.situation.upsert({
-    where: { identifier: "greeting-basic" },
+    where: { id: "greeting-basic" },
     update: {},
     create: {
-      identifier: "greeting-basic",
+      id: "greeting-basic",
       descriptions: [
         { language: "eng", content: "Basic greetings" },
         { language: "spa", content: "Primeros saludos" },
         { language: "deu", content: "Erste Grüße" },
       ],
       targetLanguage: "spa",
+      nativeLanguage: "eng",
       challengesOfExpression: {
         connect: [{ id: greetFriend.id }, { id: askHowAreYou.id }],
       },

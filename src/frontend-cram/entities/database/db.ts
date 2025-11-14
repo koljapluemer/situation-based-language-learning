@@ -12,7 +12,7 @@ import type { SituationEntity } from '../situation/types';
 export class SBLDatabase extends Dexie {
   // Entity tables
   glosses!: Table<GlossEntity, string>; // Primary key: id
-  situations!: Table<SituationEntity, string>; // Primary key: identifier
+  situations!: Table<SituationEntity, string>; // Primary key: id
 
   constructor() {
     super('SBLDatabase', { addons: [dexieCloud] });
@@ -22,8 +22,17 @@ export class SBLDatabase extends Dexie {
       // Gloss: indexed by id (primary key) and compound index [language+content] for deduplication
       glosses: 'id, [language+content], language, lastSyncedAt',
 
-      // Situation: indexed by identifier (primary key), targetLanguage for filtering, and lastSyncedAt
+      // Legacy situation schema (slug primary key)
       situations: 'identifier, targetLanguage, lastSyncedAt',
+    });
+
+    // Schema version 2 - switch situations primary key to backend id
+    this.version(2).stores({
+      glosses: 'id, [language+content], language, lastSyncedAt',
+      situations: 'id, targetLanguage, nativeLanguage, lastSyncedAt',
+    }).upgrade(async (tx) => {
+      // Clear outdated situation records (incompatible schema)
+      await tx.table('situations').clear();
     });
 
     // Dexie Cloud configuration (disabled until needed)

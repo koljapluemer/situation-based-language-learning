@@ -15,7 +15,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3333';
 const situations = ref<SituationSummaryDTO[]>([]);
 const isLoading = ref(false);
 const error = ref<string | null>(null);
-const downloadingIdentifier = ref<string | null>(null);
+const downloadingSituationId = ref<string | null>(null);
 const downloadingAll = ref(false);
 const downloadProgress = ref({ current: 0, total: 0 });
 const downloadedSituations = ref<Set<string>>(new Set());
@@ -54,7 +54,14 @@ async function fetchSituations(targetLanguage: LanguageCode) {
     }
 
     const data = await response.json();
-    situations.value = data.data || [];
+    const fetched: SituationSummaryDTO[] = data.data || [];
+    const userNativeLanguages = getKnownLanguages();
+    if (userNativeLanguages.length) {
+      const allowed = new Set(userNativeLanguages);
+      situations.value = fetched.filter(s => allowed.has(s.nativeLanguage));
+    } else {
+      situations.value = fetched;
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Unknown error';
     situations.value = [];
@@ -75,7 +82,7 @@ function getPreferredDescription(situation: SituationSummaryDTO): string {
 
   // Fallback to English
   const engDesc = situation.descriptions.find(d => d.language === 'eng');
-  return engDesc?.content || situation.identifier;
+  return engDesc?.content || situation.id;
 }
 
 function getTotalChallenges(situation: SituationSummaryDTO): number {
@@ -86,35 +93,34 @@ function getTotalChallenges(situation: SituationSummaryDTO): number {
 async function checkDownloadedSituations() {
   const downloaded = new Set<string>();
   for (const situation of situations.value) {
-    const exists = await situationExists(situation.identifier);
+    const exists = await situationExists(situation.id);
     if (exists) {
-      downloaded.add(situation.identifier);
+      downloaded.add(situation.id);
     }
   }
   downloadedSituations.value = downloaded;
 }
 
 // Download a single situation
-async function handleDownloadSituation(identifier: string) {
-  downloadingIdentifier.value = identifier;
+async function handleDownloadSituation(id: string) {
+  downloadingSituationId.value = id;
   error.value = null;
 
   try {
-    const nativeLanguages = getKnownLanguages();
-    await downloadSituation(identifier, nativeLanguages);
-    downloadedSituations.value.add(identifier);
+    await downloadSituation(id);
+    downloadedSituations.value.add(id);
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Download failed';
   } finally {
-    downloadingIdentifier.value = null;
+    downloadingSituationId.value = null;
   }
 }
 
 // Practice: download if needed, then start
-async function handlePractice(identifier: string) {
+async function handlePractice(id: string) {
   // Download if not already downloaded
-  if (!downloadedSituations.value.has(identifier)) {
-    await handleDownloadSituation(identifier);
+  if (!downloadedSituations.value.has(id)) {
+    await handleDownloadSituation(id);
 
     // Check if download failed
     if (error.value) {
@@ -123,7 +129,7 @@ async function handlePractice(identifier: string) {
   }
 
   // Navigate to practice
-  router.push({ name: 'practice-understanding-text', params: { situationId: identifier } });
+  router.push({ name: 'practice-understanding-text', params: { situationId: id } });
 }
 
 // Download all situations for current language
@@ -209,13 +215,13 @@ watch(situations, () => {
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <div
         v-for="situation in situations"
-        :key="situation.identifier"
+        :key="situation.id"
         class="card shadow hover:shadow-lg transition-shadow"
       >
         <figure v-if="situation.imageLink" class="h-48">
           <img
             :src="situation.imageLink"
-            :alt="situation.identifier"
+            :alt="situation.id"
             class="w-full h-full object-cover"
             @error="($event.target as HTMLImageElement).style.display = 'none'"
           />
@@ -225,26 +231,36 @@ watch(situations, () => {
           <p class="text-sm text-base-content/70">
             {{ getTotalChallenges(situation) }} challenge{{ getTotalChallenges(situation) !== 1 ? 's' : '' }}
           </p>
+          <div class="text-xs text-base-content/70 flex items-center gap-2">
+            <span class="font-semibold uppercase">Native:</span>
+            <span class="inline-flex items-center gap-1">
+              <span v-if="LANGUAGES[situation.nativeLanguage]?.emoji" aria-hidden="true">
+                {{ LANGUAGES[situation.nativeLanguage]?.emoji }}
+              </span>
+              {{ LANGUAGES[situation.nativeLanguage]?.name ?? situation.nativeLanguage }}
+              <span class="text-[10px] uppercase text-base-content/50">({{ situation.nativeLanguage }})</span>
+            </span>
+          </div>
           <div class="card-actions justify-end gap-2">
             <!-- Re-download button (only if already downloaded) -->
             <button
-              v-if="downloadedSituations.has(situation.identifier)"
-              @click="handleDownloadSituation(situation.identifier)"
-              :disabled="downloadingIdentifier === situation.identifier"
+              v-if="downloadedSituations.has(situation.id)"
+              @click="handleDownloadSituation(situation.id)"
+              :disabled="downloadingSituationId === situation.id"
               class="btn btn-ghost btn-sm btn-square"
               title="Re-download"
             >
-              <Download :size="16" v-if="downloadingIdentifier !== situation.identifier" />
+              <Download :size="16" v-if="downloadingSituationId !== situation.id" />
               <span v-else class="loading loading-spinner loading-xs"></span>
             </button>
 
             <!-- Practice button (downloads if needed, then starts) -->
             <button
-              @click="handlePractice(situation.identifier)"
-              :disabled="downloadingIdentifier === situation.identifier"
+              @click="handlePractice(situation.id)"
+              :disabled="downloadingSituationId === situation.id"
               class="btn btn-primary btn-sm"
             >
-              <span v-if="downloadingIdentifier !== situation.identifier">Practice</span>
+              <span v-if="downloadingSituationId !== situation.id">Practice</span>
               <span v-else class="loading loading-spinner loading-xs"></span>
             </button>
           </div>

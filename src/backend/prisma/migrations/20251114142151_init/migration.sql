@@ -1,13 +1,14 @@
 -- CreateTable
 CREATE TABLE "Situation" (
-    "identifier" TEXT NOT NULL,
+    "id" TEXT NOT NULL,
     "descriptions" JSONB NOT NULL,
     "imageLink" TEXT,
     "targetLanguage" TEXT NOT NULL,
+    "nativeLanguage" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "Situation_pkey" PRIMARY KEY ("identifier")
+    CONSTRAINT "Situation_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -155,10 +156,10 @@ ALTER TABLE "_GlossDifferentiations" ADD CONSTRAINT "_GlossDifferentiations_B_fk
 ALTER TABLE "_ExpressionChallenges" ADD CONSTRAINT "_ExpressionChallenges_A_fkey" FOREIGN KEY ("A") REFERENCES "Gloss"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "_ExpressionChallenges" ADD CONSTRAINT "_ExpressionChallenges_B_fkey" FOREIGN KEY ("B") REFERENCES "Situation"("identifier") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "_ExpressionChallenges" ADD CONSTRAINT "_ExpressionChallenges_B_fkey" FOREIGN KEY ("B") REFERENCES "Situation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_UnderstandingChallenges" ADD CONSTRAINT "_UnderstandingChallenges_A_fkey" FOREIGN KEY ("A") REFERENCES "Gloss"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "_UnderstandingChallenges" ADD CONSTRAINT "_UnderstandingChallenges_B_fkey" FOREIGN KEY ("B") REFERENCES "Situation"("identifier") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "_UnderstandingChallenges" ADD CONSTRAINT "_UnderstandingChallenges_B_fkey" FOREIGN KEY ("B") REFERENCES "Situation"("id") ON DELETE CASCADE ON UPDATE CASCADE;

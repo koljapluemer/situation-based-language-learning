@@ -46,19 +46,21 @@ interface GlossDTO {
 }
 
 interface SituationDTO {
-  identifier: string;
+  id: string;
   descriptions: LocalizedString[];
   imageLink?: string;
   targetLanguage: LanguageCode;
+  nativeLanguage: LanguageCode;
   challengesOfExpression: GlossDTO[];
   challengesOfUnderstandingText: GlossDTO[];
 }
 
 interface SituationSummaryDTO {
-  identifier: string;
+  id: string;
   descriptions: LocalizedString[];
   imageLink?: string;
   targetLanguage: LanguageCode;
+  nativeLanguage: LanguageCode;
   challengeCount: {
     expression: number;
     understanding: number;
@@ -189,23 +191,23 @@ Zod returns:
 ### List
 
 ```
-GET /situations?identifier=greeting-basic&targetLanguage=spa&nativeLanguages=eng,deu
+GET /situations?targetLanguage=spa
 ```
 
 Query parameters:
 
 | Param | Required | Description |
 | --- | --- | --- |
-| `identifier` | Optional | Filter by identifier. |
+| `id` | Optional | Filter by situation id. |
 | `targetLanguage` | Optional | Filter by target language code (e.g., "spa", "deu"). |
-| `nativeLanguages` | Optional | Comma-separated list of user's native languages (e.g., "eng,deu"). When provided, the backend filters glosses: expression challenges return only glosses in the native language (with their `translations` and `contains` filtered appropriately), while understanding challenges return only glosses in the target language (with their `translations` and `contains` filtered appropriately). |
+| `nativeLanguage` | Optional | Filter by native language code (e.g., "eng"). |
 
 Response: `{ "data": [SituationDTO, ...] }`.
 
 ### List Summary
 
 ```
-GET /situations/summary?targetLanguage=spa&nativeLanguages=eng,deu
+GET /situations/summary?targetLanguage=spa
 ```
 
 Returns lightweight situation summaries without full challenge/gloss data. Ideal for list views.
@@ -214,25 +216,22 @@ Query parameters:
 
 | Param | Required | Description |
 | --- | --- | --- |
-| `identifier` | Optional | Filter by identifier. |
+| `id` | Optional | Filter by situation id. |
 | `targetLanguage` | Optional | Filter by target language code (e.g., "spa", "deu"). |
-| `nativeLanguages` | Optional | Comma-separated list of user's native languages (currently unused in summary endpoint, but accepted for consistency). |
+| `nativeLanguage` | Optional | Filter by native language code. |
 
 Response: `{ "data": [SituationSummaryDTO, ...] }`.
 
 ### Retrieve
 
 ```
-GET /situations/:id?nativeLanguages=eng,deu
+GET /situations/:id
 ```
 
-Where `:id` is the situation identifier (e.g., `greeting-basic`), not a cuid.
+Where `:id` is the situation id (cuid or seed value).
 
-Query parameters:
-
-| Param | Required | Description |
-| --- | --- | --- |
-| `nativeLanguages` | Optional | Comma-separated list of user's native languages (e.g., "eng,deu"). When provided, the backend filters glosses: expression challenges return only glosses in the native language (with their `translations` and `contains` filtered appropriately), while understanding challenges return only glosses in the target language (with their `translations` and `contains` filtered appropriately). |
+No additional query parameters are required for language filtering; the situation's
+stored `nativeLanguage` determines how glosses are pruned.
 
 Response is `{ "data": SituationDTO }`.
 
@@ -246,13 +245,13 @@ Body schema (`situationWriteSchema`):
 
 ```json
 {
-  "identifier": "greeting-basic",
   "descriptions": [
     { "language": "eng", "content": "Basic greetings" },
     { "language": "deu", "content": "Erste Grüße" }
   ],
   "imageLink": "https://example.com/images/greeting.jpg",
   "targetLanguage": "spa",
+  "nativeLanguage": "eng",
   "challengesOfExpressionIds": ["clm1a2b3c4d5e6f7g8h9i0j1k"],
   "challengesOfUnderstandingTextIds": ["cln2b3c4d5e6f7g8h9i0j1k2l"]
 }
@@ -261,6 +260,7 @@ Body schema (`situationWriteSchema`):
 Notes:
 
 - `targetLanguage` is required and specifies the language being learned (e.g., "spa" for Spanish situations).
+- `nativeLanguage` is required and specifies the learner's base language for the situation (used for filtering glosses).
 - `imageLink` is optional and must be a valid URL if provided.
 - `descriptions` should include UI-friendly text in multiple languages to describe the situation.
 - `challengesOfExpressionIds`: Array of gloss IDs in the native language (prompts for expression practice). Defaults to `[]`.
@@ -271,14 +271,13 @@ Notes:
 ### Update
 
 ```
-PATCH /situations/:id?nativeLanguages=eng
+PATCH /situations/:id
 ```
 
-Where `:id` is the situation identifier (e.g., `greeting-basic`).
+Where `:id` is the situation id (cuid or seed-defined).
 
 - Request body uses `situationUpdateSchema` (partial updates).
 - Providing `challengesOfExpressionIds` or `challengesOfUnderstandingTextIds` replaces the entire gloss ID array for that challenge type.
-- The `nativeLanguages` query parameter controls gloss filtering in the response DTO (same as GET).
 
 ### Delete
 
@@ -286,7 +285,7 @@ Where `:id` is the situation identifier (e.g., `greeting-basic`).
 DELETE /situations/:id
 ```
 
-Where `:id` is the situation identifier (e.g., `greeting-basic`).
+Where `:id` is the situation id.
 
 Removes the situation and its gloss associations. Glosses themselves are not deleted (they remain in the catalog for reuse).
 
@@ -301,7 +300,7 @@ Removes the situation and its gloss associations. Glosses themselves are not del
 | `204` | Successful delete, no body. |
 | `400` | Validation failure (Zod). |
 | `404` | Resource not found (invalid ID or missing relation). |
-| `409` | Unique constraint violation (duplicate gloss content per language, duplicate situation identifier). |
+| `409` | Unique constraint violation (duplicate gloss content per language). |
 | `500` | Unhandled server error. |
 
 ---

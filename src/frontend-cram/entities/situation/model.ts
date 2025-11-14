@@ -8,10 +8,11 @@ import { getGloss } from '../gloss/model';
  */
 export function fromDTO(dto: SituationDTO): SituationEntity {
   return {
-    identifier: dto.identifier,
+    id: dto.id,
     descriptions: dto.descriptions,
     imageLink: dto.imageLink,
     targetLanguage: dto.targetLanguage,
+    nativeLanguage: dto.nativeLanguage,
     challengesOfExpressionIds: dto.challengesOfExpression.map(g => g.id),
     challengesOfUnderstandingTextIds: dto.challengesOfUnderstandingText.map(g => g.id),
     lastSyncedAt: new Date(),
@@ -25,10 +26,11 @@ export function fromDTO(dto: SituationDTO): SituationEntity {
  */
 export function fromSummaryDTO(dto: SituationSummaryDTO): Omit<SituationEntity, 'challengesOfExpressionIds' | 'challengesOfUnderstandingTextIds'> {
   return {
-    identifier: dto.identifier,
+    id: dto.id,
     descriptions: dto.descriptions,
     imageLink: dto.imageLink,
     targetLanguage: dto.targetLanguage,
+    nativeLanguage: dto.nativeLanguage,
     lastSyncedAt: new Date(),
     updatedAt: new Date(),
   };
@@ -36,17 +38,17 @@ export function fromSummaryDTO(dto: SituationSummaryDTO): Omit<SituationEntity, 
 
 /**
  * Upsert a single situation
- * Uses identifier as unique key
+ * Uses backend id as unique key
  */
 export async function upsertSituation(dto: SituationDTO): Promise<void> {
   const entity = fromDTO(dto);
 
-  // Check if situation already exists by identifier
-  const existing = await db.situations.get(dto.identifier);
+  // Check if situation already exists by id
+  const existing = await db.situations.get(dto.id);
 
   if (existing) {
     // Update existing situation
-    await db.situations.update(dto.identifier, {
+    await db.situations.update(dto.id, {
       ...entity,
       updatedAt: new Date(),
     });
@@ -74,14 +76,15 @@ export async function upsertSituations(dtos: SituationDTO[]): Promise<void> {
 export async function upsertSituationSummary(dto: SituationSummaryDTO): Promise<void> {
   const partial = fromSummaryDTO(dto);
 
-  const existing = await db.situations.get(dto.identifier);
+  const existing = await db.situations.get(dto.id);
 
   if (existing) {
     // Only update metadata, preserve existing challenges
-    await db.situations.update(dto.identifier, {
+    await db.situations.update(dto.id, {
       descriptions: partial.descriptions,
       imageLink: partial.imageLink,
       targetLanguage: partial.targetLanguage,
+      nativeLanguage: partial.nativeLanguage,
       lastSyncedAt: partial.lastSyncedAt,
       updatedAt: partial.updatedAt,
     });
@@ -96,10 +99,10 @@ export async function upsertSituationSummary(dto: SituationSummaryDTO): Promise<
 }
 
 /**
- * Get a situation by identifier
+ * Get a situation by id
  */
-export async function getSituation(identifier: string): Promise<SituationEntity | undefined> {
-  return db.situations.get(identifier);
+export async function getSituation(id: string): Promise<SituationEntity | undefined> {
+  return db.situations.get(id);
 }
 
 /**
@@ -117,10 +120,10 @@ export async function getAllSituations(): Promise<SituationEntity[]> {
 }
 
 /**
- * Delete a situation by identifier
+ * Delete a situation by id
  */
-export async function deleteSituation(identifier: string): Promise<void> {
-  await db.situations.delete(identifier);
+export async function deleteSituation(id: string): Promise<void> {
+  await db.situations.delete(id);
 }
 
 /**
@@ -133,8 +136,8 @@ export async function clearAllSituations(): Promise<void> {
 /**
  * Check if a situation exists locally
  */
-export async function situationExists(identifier: string): Promise<boolean> {
-  const count = await db.situations.where('identifier').equals(identifier).count();
+export async function situationExists(id: string): Promise<boolean> {
+  const count = await db.situations.where('id').equals(id).count();
   return count > 0;
 }
 

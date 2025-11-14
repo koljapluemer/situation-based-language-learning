@@ -8,12 +8,11 @@ import { upsertGlosses } from '../../entities/gloss';
  * Stores lightweight metadata without full challenge/gloss data
  */
 export async function downloadSituationSummaries(
-  targetLanguage: LanguageCode,
-  nativeLanguages: LanguageCode[]
+  targetLanguage: LanguageCode
 ): Promise<{ count: number }> {
-  const summaries = await fetchSituationSummaries(targetLanguage, nativeLanguages);
+  const summaries = await fetchSituationSummaries(targetLanguage);
 
-  // Upsert each summary (smart merge by identifier)
+  // Upsert each summary (smart merge by id)
   for (const summary of summaries) {
     await upsertSituationSummary(summary);
   }
@@ -76,17 +75,16 @@ function collectAllGlossIds(
 /**
  * Download full situation details including ALL related glosses
  * Performs smart merge:
- * - Situations merged by identifier
+ * - Situations merged by id
  * - Glosses deduplicated by [language+content]
  * - Recursively fetches all referenced glosses (contains, translations, etc.)
  */
 export async function downloadSituation(
-  identifier: string,
-  nativeLanguages: LanguageCode[]
+  id: string
 ): Promise<void> {
-  const situation = await fetchSituation(identifier, nativeLanguages);
+  const situation = await fetchSituation(id);
 
-  console.log('[downloadSituation] Downloaded situation:', identifier);
+  console.log('[downloadSituation] Downloaded situation:', id);
   console.log('[downloadSituation] Expression challenges:', situation.challengesOfExpression.length);
   console.log('[downloadSituation] Understanding challenges:', situation.challengesOfUnderstandingText.length);
 
@@ -144,10 +142,10 @@ export async function downloadSituation(
     await upsertGlosses(allGlosses);
   }
 
-  // Phase 4: Upsert situation (smart merge by identifier)
+  // Phase 4: Upsert situation (smart merge by id)
   await upsertSituation(situation);
 
-  console.log('[downloadSituation] Download complete for', identifier);
+  console.log('[downloadSituation] Download complete for', id);
 }
 
 /**
@@ -162,19 +160,22 @@ export async function downloadAllSituations(
   onProgress?: (current: number, total: number) => void
 ): Promise<{ count: number }> {
   // Phase 1: Download summaries
-  const { count } = await downloadSituationSummaries(targetLanguage, nativeLanguages);
+  const { count } = await downloadSituationSummaries(targetLanguage);
 
   if (count === 0) {
     return { count: 0 };
   }
 
   // Phase 2: Download full details for each situation
-  const summaries = await fetchSituationSummaries(targetLanguage, nativeLanguages);
+  const summaries = await fetchSituationSummaries(targetLanguage);
+  const filteredSummaries = nativeLanguages.length
+    ? summaries.filter(summary => nativeLanguages.includes(summary.nativeLanguage))
+    : summaries;
 
-  for (let i = 0; i < summaries.length; i++) {
-    await downloadSituation(summaries[i].identifier, nativeLanguages);
-    onProgress?.(i + 1, summaries.length);
+  for (let i = 0; i < filteredSummaries.length; i++) {
+    await downloadSituation(filteredSummaries[i].id);
+    onProgress?.(i + 1, filteredSummaries.length);
   }
 
-  return { count: summaries.length };
+  return { count: filteredSummaries.length };
 }

@@ -171,7 +171,7 @@ Key guidelines:
 8. **Notes**: Add helpful notes about usage, formality, context, etc.
 
 Situation context:
-- Identifier: ${context.situation.identifier}
+- Situation ID: ${context.situation.id}
 - Descriptions: ${context.situation.descriptions.map(d => `${d.language}: ${d.content}`).join(", ")}
 - Target language: ${context.targetLanguage}
 - Native language: ${context.nativeLanguage}`;
@@ -265,7 +265,7 @@ Key guidelines:
 8. **Notes**: Add helpful notes about usage, formality, context, etc.
 
 Situation context:
-- Identifier: ${context.situation.identifier}
+- Situation ID: ${context.situation.id}
 - Descriptions: ${context.situation.descriptions.map(d => `${d.language}: ${d.content}`).join(", ")}
 - Target language: ${context.targetLanguage}
 - Native language: ${context.nativeLanguage}

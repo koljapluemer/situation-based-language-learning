@@ -3,11 +3,10 @@ import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/vue-query";
 import { ChevronRight, ChevronDown, Edit, ExternalLink, Trash2, Plus, Sparkles } from "lucide-vue-next";
-import { LANGUAGES, type SituationDTO, type LocalizedString, type LanguageCode, type GlossDTO } from "@sbl/shared";
+import { LANGUAGES, type SituationDTO, type LocalizedString, type GlossDTO } from "@sbl/shared";
 import { useToast } from "../../dumb/toasts/index";
 import ModalEditSituation from "../../features/situation-edit/ModalEditSituation.vue";
 import { useModalEditSituation } from "../../features/situation-edit/index";
-import LanguageSelect from "../../dumb/LanguageSelect.vue";
 import GlossModal from "../../features/gloss-manage/GlossModal.vue";
 import GlossTreeNode from "../../features/gloss-tree/GlossTreeNode.vue";
 import ModalGenerateUnderstandingChallenges from "../../features/ai-challenges/ModalGenerateUnderstandingChallenges.vue";
@@ -25,19 +24,17 @@ const showGlossModalUnderstanding = ref(false);
 const showAIGenerateModal = ref(false);
 const expressionSectionOpen = ref(true);
 const understandingSectionOpen = ref(true);
-const selectedNativeLanguage = ref<LanguageCode>("eng");
 
 const { open: openEditModal } = useModalEditSituation();
 
 // Fetch situation with TanStack Query
-const situationQueryKey = computed(() => ["situation", situationId, selectedNativeLanguage.value]);
+const situationQueryKey = computed(() => ["situation", situationId]);
 
 const { data: situation, isLoading, error } = useQuery({
   queryKey: situationQueryKey,
   queryFn: async ({ queryKey }) => {
-    const [, id, nativeLanguage] = queryKey as [string, string, LanguageCode?];
-    const languageParam = nativeLanguage ?? "eng";
-    const response = await fetch(`${API_BASE_URL}/situations/${id}?nativeLanguages=${languageParam}`);
+    const [, id] = queryKey as [string, string];
+    const response = await fetch(`${API_BASE_URL}/situations/${id}`);
     if (!response.ok) {
       if (response.status === 404) {
         throw new Error("Situation not found");
@@ -57,6 +54,18 @@ const { data: situation, isLoading, error } = useQuery({
 const languageInfo = computed(() => {
   const code = situation.value?.targetLanguage;
   return code ? LANGUAGES[code] ?? null : null;
+});
+const nativeLanguageInfo = computed(() => {
+  const code = situation.value?.nativeLanguage;
+  return code ? LANGUAGES[code] ?? null : null;
+});
+const primaryDescription = computed(() => {
+  if (!situation.value) return "";
+  return (
+    situation.value.descriptions.find(desc => desc.language === "eng")?.content ??
+    situation.value.descriptions[0]?.content ??
+    ""
+  );
 });
 
 function goBack() {
@@ -161,7 +170,7 @@ function handleEditSituation() {
   openEditModal(situation.value);
 }
 
-async function handleUpdateSituation(identifier: string, descriptions: LocalizedString[], imageLink?: string) {
+async function handleUpdateSituation(descriptions: LocalizedString[], imageLink?: string) {
   try {
     const response = await fetch(`${API_BASE_URL}/situations/${situationId}`, {
       method: "PATCH",
@@ -169,26 +178,17 @@ async function handleUpdateSituation(identifier: string, descriptions: Localized
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        identifier,
         descriptions,
         imageLink,
       }),
     });
 
     if (!response.ok) {
-      if (response.status === 409) {
-        throw new Error("Conflict: This identifier already exists or the situation was modified by another user");
-      }
       throw new Error(`Failed to update situation: ${response.status}`);
     }
 
     await queryClient.invalidateQueries({ queryKey: ["situation", situationId] });
     toast.success("Situation updated successfully");
-
-    // If identifier changed, navigate to new URL
-    if (identifier !== situationId) {
-      router.push({ name: "situation-view", params: { id: identifier } });
-    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     toast.error(`Failed to update situation: ${message}`);
@@ -224,18 +224,31 @@ function handleGlossChanged() {
         <div class="card-body">
           <div class="flex items-start justify-between gap-4">
             <div class="flex-1">
-              <h2 class="card-title">{{ situation.identifier }}</h2>
-              <p class="mt-1 text-sm text-base-content/70 flex items-center gap-2">
-                <span class="font-medium uppercase text-xs tracking-wide text-base-content/70">
-                  Target language:
-                </span>
-                <span class="inline-flex items-center gap-1">
-                  <span v-if="languageInfo?.emoji" aria-hidden="true">{{ languageInfo?.emoji }}</span>
-                  {{ languageInfo?.name ?? situation.targetLanguage }}
-                  <span class="text-xs uppercase text-base-content/60">({{ situation.targetLanguage }})</span>
-                </span>
-              </p>
-              <div v-if="situation.descriptions.length" class="space-y-1 mt-2">
+              <h2 class="card-title">{{ primaryDescription || 'Untitled situation' }}</h2>
+              <p class="mt-1 text-xs font-mono text-base-content/60 break-all">ID: {{ situation.id }}</p>
+              <div class="mt-2 space-y-1 text-sm text-base-content/70">
+                <p class="flex items-center gap-2">
+                  <span class="font-medium uppercase text-xs tracking-wide text-base-content/70">
+                    Target language:
+                  </span>
+                  <span class="inline-flex items-center gap-1">
+                    <span v-if="languageInfo?.emoji" aria-hidden="true">{{ languageInfo?.emoji }}</span>
+                    {{ languageInfo?.name ?? situation.targetLanguage }}
+                    <span class="text-xs uppercase text-base-content/60">({{ situation.targetLanguage }})</span>
+                  </span>
+                </p>
+                <p class="flex items-center gap-2">
+                  <span class="font-medium uppercase text-xs tracking-wide text-base-content/70">
+                    Native language:
+                  </span>
+                  <span class="inline-flex items-center gap-1">
+                    <span v-if="nativeLanguageInfo?.emoji" aria-hidden="true">{{ nativeLanguageInfo?.emoji }}</span>
+                    {{ nativeLanguageInfo?.name ?? situation.nativeLanguage }}
+                    <span class="text-xs uppercase text-base-content/60">({{ situation.nativeLanguage }})</span>
+                  </span>
+                </p>
+              </div>
+              <div v-if="situation.descriptions.length" class="space-y-1 mt-4">
                 <p v-for="desc in situation.descriptions" :key="desc.language" class="text-sm">
                   <span class="font-medium uppercase text-xs tracking-wide text-base-content/70">
                     {{ desc.language }}:
@@ -252,7 +265,7 @@ function handleGlossChanged() {
           <!-- Image Display -->
           <div v-if="situation.imageLink" class="mt-4 space-y-2">
             <div class="relative">
-              <img :src="situation.imageLink" :alt="`Image for ${situation.identifier}`"
+              <img :src="situation.imageLink" :alt="`Image for ${situation.id}`"
                 class="w-full max-w-md rounded-lg shadow-sm"
                 @error="($event.target as HTMLImageElement).style.display = 'none'" />
             </div>
@@ -263,14 +276,6 @@ function handleGlossChanged() {
             </a>
           </div>
         </div>
-      </div>
-
-      <!-- Native Language Filter -->
-      <div class="flex flex-wrap items-end gap-4">
-        <fieldset class="fieldset max-w-xs">
-          <label for="native-language" class="label">Native Language</label>
-          <LanguageSelect id="native-language" v-model="selectedNativeLanguage" />
-        </fieldset>
       </div>
 
       <!-- Challenges of Expression -->
@@ -286,7 +291,7 @@ function handleGlossChanged() {
 
             <div class="mt-4 space-y-3">
               <div class="text-sm text-base-content/70 mb-2">
-                Glosses in native language ({{ selectedNativeLanguage }}) that prompt learners to express themselves in {{ situation.targetLanguage }}
+                Glosses in native language ({{ situation.nativeLanguage }}) that prompt learners to express themselves in {{ situation.targetLanguage }}
               </div>
 
               <div v-if="situation.challengesOfExpression.length === 0" class="text-center py-4 text-base-content/70">
@@ -300,7 +305,7 @@ function handleGlossChanged() {
                       <div class="flex-1">
                         <GlossTreeNode
                           :gloss="gloss"
-                          :enforce-language="selectedNativeLanguage"
+                          :enforce-language="situation.nativeLanguage"
                           :translation-language="situation.targetLanguage"
                           @changed="handleGlossChanged"
                         />
@@ -391,11 +396,11 @@ function handleGlossChanged() {
       </div>
     </div>
 
-    <GlossModal
+      <GlossModal
       v-if="situation"
       :show="showGlossModalExpression"
       mode="create"
-      :locked-language="selectedNativeLanguage"
+      :locked-language="situation.nativeLanguage"
       @close="showGlossModalExpression = false"
       @saved="(gloss) => handleGlossAdded(gloss, 'expression')"
     />
@@ -413,7 +418,7 @@ function handleGlossChanged() {
       v-if="situation"
       :show="showAIGenerateModal"
       :situation="situation"
-      :native-language="selectedNativeLanguage"
+      :native-language="situation.nativeLanguage"
       @close="showAIGenerateModal = false"
       @saved="handleAIGenerated"
     />

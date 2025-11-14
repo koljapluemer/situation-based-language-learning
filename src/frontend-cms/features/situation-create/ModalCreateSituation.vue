@@ -7,27 +7,29 @@ import LanguageSelect from "../../dumb/LanguageSelect.vue";
 const { isOpen, close } = useModalCreateSituation();
 
 const emit = defineEmits<{
-  create: [description: string, targetLanguage: LanguageCode, imageLink?: string];
+  create: [description: string, targetLanguage: LanguageCode, nativeLanguage: LanguageCode, imageLink?: string];
 }>();
 
 const description = ref("");
 const targetLanguage = ref<LanguageCode>("" as LanguageCode);
+const nativeLanguage = ref<LanguageCode>("eng");
 const imageLink = ref("");
 const isSubmitting = ref(false);
 
 function handleSubmit() {
   const trimmed = description.value.trim();
-  if (!trimmed || !targetLanguage.value) return;
+  if (!trimmed || !targetLanguage.value || !nativeLanguage.value) return;
 
   isSubmitting.value = true;
   const imageLinkValue = imageLink.value.trim() || undefined;
-  emit("create", trimmed, targetLanguage.value, imageLinkValue);
+  emit("create", trimmed, targetLanguage.value, nativeLanguage.value, imageLinkValue);
 }
 
 function handleClose() {
   if (isSubmitting.value) return;
   description.value = "";
   targetLanguage.value = "" as LanguageCode;
+  nativeLanguage.value = "eng";
   imageLink.value = "";
   close();
 }
@@ -37,6 +39,7 @@ function handleModalClose() {
   if (!isOpen.value) {
     description.value = "";
     targetLanguage.value = "" as LanguageCode;
+    nativeLanguage.value = "eng";
     imageLink.value = "";
     isSubmitting.value = false;
   }
@@ -74,6 +77,16 @@ function handleModalClose() {
           </fieldset>
 
           <fieldset class="fieldset">
+            <label for="native-language" class="label">Native Language (learner's language)</label>
+            <LanguageSelect
+              id="native-language"
+              v-model="nativeLanguage"
+              :disabled="isSubmitting"
+              required
+            />
+          </fieldset>
+
+          <fieldset class="fieldset">
             <label for="image-link" class="label">Image URL (optional)</label>
             <input
               id="image-link"
@@ -97,7 +110,7 @@ function handleModalClose() {
             <button
               type="submit"
               class="btn btn-primary"
-              :disabled="!description.trim() || !targetLanguage || isSubmitting"
+              :disabled="!description.trim() || !targetLanguage || !nativeLanguage || isSubmitting"
             >
               <span v-if="isSubmitting" class="loading loading-spinner loading-sm"></span>
               {{ isSubmitting ? "Creating..." : "Create" }}

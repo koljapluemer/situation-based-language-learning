@@ -18,9 +18,10 @@ export function createAnalyzeSituationTool(situationService: SituationService) {
         return JSON.stringify({
           success: true,
           situation: {
-            identifier: situation.identifier,
+            id: situation.id,
             descriptions: situation.descriptions,
             targetLanguage: situation.targetLanguage,
+            nativeLanguage: situation.nativeLanguage,
             imageLink: situation.imageLink,
             challengeCounts: {
               expression: situation.challengesOfExpression.length,
@@ -56,7 +57,7 @@ export function createAnalyzeSituationTool(situationService: SituationService) {
       schema: z.object({
         situationId: z
           .string()
-          .describe("The situation identifier (e.g., 'greeting-basic')"),
+          .describe("The situation id (cuid string or seed-defined value)"),
       }),
     }
   );

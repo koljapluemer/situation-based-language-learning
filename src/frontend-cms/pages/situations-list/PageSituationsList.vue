@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { LANGUAGES, type SituationDTO } from "@sbl/shared";
+import { LANGUAGES, type LanguageCode, type SituationDTO } from "@sbl/shared";
 import { Eye } from "lucide-vue-next";
 import ModalCreateSituation from "../../features/situation-create/ModalCreateSituation.vue";
 import { useModalCreateSituation } from "../../features/situation-create/index";
 import { useToast } from "../../dumb/toasts/index";
-import { slugify } from "../../dumb/slug";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3333";
 
@@ -44,9 +43,7 @@ async function loadSituations() {
   }
 }
 
-async function handleCreateSituation(description: string, targetLanguage: string, imageLink?: string) {
-  const identifier = slugify(description);
-
+async function handleCreateSituation(description: string, targetLanguage: LanguageCode, nativeLanguage: LanguageCode, imageLink?: string) {
   try {
     const response = await fetch(`${API_BASE_URL}/situations`, {
       method: "POST",
@@ -54,7 +51,6 @@ async function handleCreateSituation(description: string, targetLanguage: string
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        identifier,
         descriptions: [
           {
             language: "eng",
@@ -62,16 +58,12 @@ async function handleCreateSituation(description: string, targetLanguage: string
           },
         ],
         targetLanguage,
+        nativeLanguage,
         imageLink,
-        challengesOfExpression: [],
-        challengesOfUnderstandingText: [],
       }),
     });
 
     if (!response.ok) {
-      if (response.status === 409) {
-        throw new Error("A situation with this identifier already exists");
-      }
       throw new Error(`Request failed with status ${response.status}`);
     }
 
@@ -127,7 +119,7 @@ onMounted(loadSituations);
               No situations found.
             </td>
           </tr>
-          <tr v-for="situation in situations" :key="situation.identifier">
+          <tr v-for="situation in situations" :key="situation.id">
             <td class="max-w-2xl whitespace-pre-line text-sm">
               {{ getEnglishDescription(situation) }}
             </td>
@@ -142,7 +134,7 @@ onMounted(loadSituations);
             </td>
             <td>
               <router-link
-                :to="{ name: 'situation-view', params: { id: situation.identifier } }"
+                :to="{ name: 'situation-view', params: { id: situation.id } }"
                 class="btn btn-ghost btn-sm"
                 aria-label="View situation"
               >

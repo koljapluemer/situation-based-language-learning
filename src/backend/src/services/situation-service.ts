@@ -33,10 +33,10 @@ export class SituationService {
     try {
       const situation = await this.client.situation.create({
         data: {
-          identifier: payload.identifier,
           descriptions: payload.descriptions,
           imageLink: payload.imageLink,
           targetLanguage: payload.targetLanguage,
+          nativeLanguage: payload.nativeLanguage,
           challengesOfExpression: this.connectGlosses(payload.challengesOfExpressionIds),
           challengesOfUnderstandingText: this.connectGlosses(payload.challengesOfUnderstandingTextIds),
         },
@@ -44,9 +44,9 @@ export class SituationService {
       });
 
       const glossMap = await this.resolveGlossesForSituation(situation);
-      return this.toDTO(situation, glossMap, {});
+      return this.toDTO(situation, glossMap);
     } catch (error) {
-      this.handlePrismaError(error, payload.identifier);
+      this.handlePrismaError(error);
       throw error;
     }
   }
@@ -59,10 +59,10 @@ export class SituationService {
 
     try {
       const data: Prisma.SituationUpdateInput = {};
-      if (payload.identifier) data.identifier = payload.identifier;
       if (payload.descriptions) data.descriptions = payload.descriptions as Prisma.JsonArray;
       if (payload.imageLink !== undefined) data.imageLink = payload.imageLink;
       if (payload.targetLanguage) data.targetLanguage = payload.targetLanguage;
+      if (payload.nativeLanguage) data.nativeLanguage = payload.nativeLanguage;
 
       // Handle gloss array updates
       if (payload.challengesOfExpressionIds !== undefined) {
@@ -77,23 +77,23 @@ export class SituationService {
         };
       }
 
-      await this.client.situation.update({ where: { identifier: id }, data });
+      await this.client.situation.update({ where: { id }, data });
 
       return this.findById(id, {});
     } catch (error) {
-      this.handlePrismaError(error, payload.identifier);
+      this.handlePrismaError(error);
       throw error;
     }
   }
 
   async delete(id: string): Promise<void> {
     await this.ensureExists(id);
-    await this.client.situation.delete({ where: { identifier: id } });
+    await this.client.situation.delete({ where: { id } });
   }
 
   async findById(id: string, query: SituationQueryInput): Promise<SituationDTO> {
     const situation = await this.client.situation.findUnique({
-      where: { identifier: id },
+      where: { id },
       include: situationInclude,
     });
 
@@ -102,16 +102,19 @@ export class SituationService {
     }
 
     const glossMap = await this.resolveGlossesForSituation(situation);
-    return this.toDTO(situation, glossMap, query);
+    return this.toDTO(situation, glossMap);
   }
 
   async list(query: SituationQueryInput): Promise<SituationDTO[]> {
     const where: Prisma.SituationWhereInput = {};
-    if (query.identifier) {
-      where.identifier = query.identifier;
+    if (query.id) {
+      where.id = query.id;
     }
     if (query.targetLanguage) {
       where.targetLanguage = query.targetLanguage;
+    }
+    if (query.nativeLanguage) {
+      where.nativeLanguage = query.nativeLanguage;
     }
 
     const situations = await this.client.situation.findMany({
@@ -124,25 +127,29 @@ export class SituationService {
     situations.forEach((situation) => this.collectGlossIds(situation, glossIds));
     const glossMap = await this.resolver.resolveByIds(Array.from(glossIds));
 
-    return situations.map((situation) => this.toDTO(situation, glossMap, query));
+    return situations.map((situation) => this.toDTO(situation, glossMap));
   }
 
   async listSummary(query: SituationQueryInput): Promise<SituationSummaryDTO[]> {
     const where: Prisma.SituationWhereInput = {};
-    if (query.identifier) {
-      where.identifier = query.identifier;
+    if (query.id) {
+      where.id = query.id;
     }
     if (query.targetLanguage) {
       where.targetLanguage = query.targetLanguage;
+    }
+    if (query.nativeLanguage) {
+      where.nativeLanguage = query.nativeLanguage;
     }
 
     const situations = await this.client.situation.findMany({
       where,
       select: {
-        identifier: true,
+        id: true,
         descriptions: true,
         imageLink: true,
         targetLanguage: true,
+        nativeLanguage: true,
         _count: {
           select: {
             challengesOfExpression: true,
@@ -154,10 +161,11 @@ export class SituationService {
     });
 
     return situations.map((situation) => ({
-      identifier: situation.identifier,
+      id: situation.id,
       descriptions: this.parseDescriptions(situation.descriptions),
       imageLink: situation.imageLink ?? undefined,
       targetLanguage: situation.targetLanguage as LanguageCode,
+      nativeLanguage: situation.nativeLanguage as LanguageCode,
       challengeCount: {
         expression: situation._count.challengesOfExpression,
         understanding: situation._count.challengesOfUnderstandingText,
@@ -176,12 +184,11 @@ export class SituationService {
 
   private toDTO(
     situation: SituationWithRelations,
-    glossMap: Map<string, GlossDTO>,
-    query: SituationQueryInput = {}
+    glossMap: Map<string, GlossDTO>
   ): SituationDTO {
     const descriptions = this.parseDescriptions(situation.descriptions);
     const targetLanguage = situation.targetLanguage as LanguageCode;
-    const nativeLanguage = this.selectNativeLanguage(query.nativeLanguages);
+    const nativeLanguage = situation.nativeLanguage as LanguageCode;
 
     // Map expression challenges (glosses in native language)
     const expressionGlosses = situation.challengesOfExpression.map((gloss) =>
@@ -204,10 +211,11 @@ export class SituationService {
     );
 
     return {
-      identifier: situation.identifier,
+      id: situation.id,
       descriptions,
       imageLink: situation.imageLink ?? undefined,
       targetLanguage,
+      nativeLanguage,
       challengesOfExpression: filteredExpressionGlosses,
       challengesOfUnderstandingText: filteredUnderstandingGlosses,
     };
@@ -291,10 +299,6 @@ export class SituationService {
     return [];
   }
 
-  private selectNativeLanguage(nativeLanguages?: LanguageCode[]): LanguageCode | undefined {
-    return nativeLanguages && nativeLanguages.length ? nativeLanguages[0] : undefined;
-  }
-
   private filterExpressionGlosses(
     glosses: GlossDTO[],
     targetLanguage: LanguageCode,
@@ -357,16 +361,16 @@ export class SituationService {
   }
 
   private async ensureExists(id: string) {
-    const exists = await this.client.situation.findUnique({ where: { identifier: id }, select: { identifier: true } });
+    const exists = await this.client.situation.findUnique({ where: { id }, select: { id: true } });
     if (!exists) {
       throw new NotFoundError(`Situation ${id} not found`);
     }
   }
 
-  private handlePrismaError(error: unknown, identifier?: string) {
+  private handlePrismaError(error: unknown) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2002") {
-        throw new ConflictError(`Situation identifier ${identifier} already exists`);
+        throw new ConflictError("Situation already exists");
       }
       if (error.code === "P2025") {
         throw new NotFoundError("Referenced gloss not found");

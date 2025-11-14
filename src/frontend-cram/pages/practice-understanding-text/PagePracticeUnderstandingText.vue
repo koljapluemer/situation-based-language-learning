@@ -248,7 +248,7 @@ onMounted(async () => {
       return;
     }
 
-    situationIdentifier.value = situation.identifier;
+    situationIdentifier.value = situation.id;
     targetLanguage.value = situation.targetLanguage;
 
     // Check if situation has understanding text glosses

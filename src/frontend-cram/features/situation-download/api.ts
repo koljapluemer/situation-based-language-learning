@@ -7,14 +7,10 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3333
  * Includes native languages for language-aware filtering
  */
 export async function fetchSituationSummaries(
-  targetLanguage: LanguageCode,
-  nativeLanguages: LanguageCode[]
+  targetLanguage: LanguageCode
 ): Promise<SituationSummaryDTO[]> {
   const params = new URLSearchParams();
   params.set('targetLanguage', targetLanguage);
-  if (nativeLanguages.length > 0) {
-    params.set('nativeLanguages', nativeLanguages.join(','));
-  }
 
   const response = await fetch(`${API_BASE_URL}/situations/summary?${params.toString()}`);
 
@@ -27,21 +23,13 @@ export async function fetchSituationSummaries(
 }
 
 /**
- * Fetch full situation details by identifier
+ * Fetch full situation details by id
  * Includes native languages for language-aware filtering (one prompt per challenge, filtered glosses)
  */
 export async function fetchSituation(
-  identifier: string,
-  nativeLanguages: LanguageCode[]
+  id: string
 ): Promise<SituationDTO> {
-  const params = new URLSearchParams();
-  if (nativeLanguages.length > 0) {
-    params.set('nativeLanguages', nativeLanguages.join(','));
-  }
-
-  const url = params.toString()
-    ? `${API_BASE_URL}/situations/${identifier}?${params.toString()}`
-    : `${API_BASE_URL}/situations/${identifier}`;
+  const url = `${API_BASE_URL}/situations/${id}`;
 
   const response = await fetch(url);
 

@@ -3,10 +3,11 @@ import { LocalizedString } from "../LocalizedString"
 import { LanguageCode } from "../Language"
 
 export interface SituationDTO {
-    identifier: string
+    id: string
     descriptions: LocalizedString[]
     imageLink?: string
     targetLanguage: LanguageCode
+    nativeLanguage: LanguageCode
 
     challengesOfUnderstandingText: GlossDTO[]
     challengesOfExpression: GlossDTO[]
