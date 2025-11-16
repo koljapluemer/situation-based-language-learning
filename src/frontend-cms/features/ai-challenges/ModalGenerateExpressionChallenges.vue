@@ -21,7 +21,7 @@ const emit = defineEmits<{
     :show="show"
     :situation="situation"
     :native-language="nativeLanguage"
-    challenge-type="understanding"
+    challenge-type="expression"
     @close="emit('close')"
     @saved="emit('saved')"
   />

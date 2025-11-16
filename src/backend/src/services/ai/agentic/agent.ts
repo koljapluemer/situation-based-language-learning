@@ -366,6 +366,209 @@ export class AgenticGenerator {
     }
   }
 
+  /**
+   * Generate expression challenges using agentic approach
+   *
+   * The agent will:
+   * 1. Analyze the situation context
+   * 2. Search for existing glosses to avoid duplicates
+   * 3. Generate high-level native language glosses (communicative functions)
+   * 4. Provide target language translations
+   * 5. Create recursive contains structures for both glosses AND translations
+   *
+   * @param context - Generation context
+   * @returns Generated glosses and metadata
+   */
+  async generateExpressionChallenges(
+    context: AgenticGenerationContext
+  ): Promise<AgenticGenerationResult> {
+    const provider = context.provider ?? AI_CONFIG.provider;
+    const runId = context.runId ?? randomUUID();
+    context.runId = runId;
+    const agentRunner = this.createAgentRunner(provider);
+
+    const systemPrompt = this.buildExpressionSystemPrompt(context);
+    const userPrompt = this.buildExpressionUserPrompt(context);
+
+    let iterations = 0;
+    let toolCalls = 0;
+    const errors: string[] = [];
+    const logs: AgenticGenerationLogEntry[] = [];
+    let searchFailures = 0;
+    let generationPhase = false;
+    this.recordLog(runId, logs, "info", "Starting agentic expression generation run", {
+      situationId: context.situationId,
+      targetLanguage: context.targetLanguage,
+      nativeLanguage: context.nativeLanguage,
+      hasHints: Boolean(context.userHints),
+    });
+    const messages: any[] = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ];
+
+    // ReAct loop: agent calls tools, processes results, decides when done
+    try {
+      while (iterations < AI_CONFIG.agentic.maxIterations) {
+        iterations++;
+        this.recordLog(runId, logs, "info", `Iteration ${iterations} started`);
+
+        try {
+          if (!generationPhase && searchFailures >= 3) {
+            generationPhase = true;
+            const nudge = "You've already looked for existing glosses several times without results. Switch to generating new glosses now.";
+            messages.push({ role: "system", content: nudge });
+            this.recordLog(
+              runId,
+              logs,
+              "info",
+              "Switching to generation phase after repeated empty searches"
+            );
+          }
+
+          const response = await agentRunner.invoke(messages);
+          messages.push(response);
+          const responseSummary = this.summarizeResponse(response.content);
+          this.recordLog(runId, logs, "info", `Iteration ${iterations} model response`, {
+            toolCalls: response.tool_calls?.map((call) => call.name) ?? [],
+            responseSummary,
+          });
+
+          // Check if agent called tools
+          if (response.tool_calls && response.tool_calls.length > 0) {
+            toolCalls += response.tool_calls.length;
+
+            // Execute tool calls
+            for (const toolCall of response.tool_calls) {
+              const tool = this.tools.get(toolCall.name);
+              if (tool) {
+                this.recordLog(runId, logs, "tool", `Calling tool ${toolCall.name}`, {
+                  args: toolCall.args,
+                });
+                try {
+                  const result = await tool.invoke(toolCall.args);
+                  messages.push({
+                    role: "tool",
+                    tool_call_id: toolCall.id,
+                    name: toolCall.name,
+                    content: result,
+                  });
+                  this.recordLog(runId, logs, "tool", `Tool ${toolCall.name} completed`, {
+                    result: this.formatForLog(result),
+                  });
+                  this.captureToolSideEffects(toolCall.name, toolCall.args, result);
+                  if (toolCall.name === "searchExistingGlosses") {
+                    const parsed = this.safeParseJSON(result);
+                    const count = typeof parsed?.count === "number" ? parsed.count : 0;
+                    if (count === 0) {
+                      searchFailures++;
+                    } else {
+                      searchFailures = 0;
+                    }
+                  }
+                } catch (error) {
+                  const errorMsg = error instanceof Error ? error.message : String(error);
+                  errors.push(`Tool ${toolCall.name} failed: ${errorMsg}`);
+                  this.recordLog(runId, logs, "error", `Tool ${toolCall.name} failed`, {
+                    error: errorMsg,
+                  });
+                  messages.push({
+                    role: "tool",
+                    tool_call_id: toolCall.id,
+                    name: toolCall.name,
+                    content: JSON.stringify({ error: errorMsg }),
+                  });
+                }
+              }
+            }
+
+            // Continue loop to let agent process tool results
+            continue;
+          }
+
+          // No tool calls - agent is done, extract final answer
+          const content = response.content;
+          if (typeof content === "string") {
+            // Try to parse JSON from the response
+          let glosses = this.extractGlossesFromResponse(content);
+          glosses = await this.ensureStructuredOutput(glosses, provider);
+          glosses = this.normalizeGlosses(glosses);
+          const validation = this.validateExpressionGlosses(glosses, context);
+            if (validation.valid) {
+              this.recordLog(runId, logs, "result", "Agent returned final response", {
+                glossCount: glosses.length,
+              });
+              return {
+                glosses,
+                iterations,
+                toolCalls,
+                errors,
+                logs,
+                runId,
+              };
+            }
+            messages.push({
+              role: "user",
+              content: validation.feedback,
+            });
+            this.recordLog(
+              runId,
+              logs,
+              "info",
+              "Gloss validation failed, requesting fixes",
+              { issues: validation.issues }
+            );
+            continue;
+          }
+
+          // If we got here without glosses, ask agent to provide final answer
+          messages.push({
+            role: "user",
+            content:
+              "Please provide your final answer as a JSON object with a 'glosses' array containing the generated expression challenges.",
+          });
+          this.recordLog(runId, logs, "info", "Requested agent to return final answer in JSON format");
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          errors.push(`Iteration ${iterations} failed: ${errorMsg}`);
+          this.recordLog(runId, logs, "error", `Iteration ${iterations} failed`, {
+            error: errorMsg,
+          });
+
+          // If too many errors, abort
+          if (errors.length >= AI_CONFIG.agentic.maxErrors) {
+            this.recordLog(runId, logs, "error", "Maximum error threshold reached, aborting run");
+            break;
+          }
+        }
+      }
+      // Max iterations reached, try to extract any glosses from messages
+      const lastMessage = messages[messages.length - 1];
+      let glosses =
+        typeof lastMessage.content === "string"
+          ? this.extractGlossesFromResponse(lastMessage.content)
+          : [];
+      glosses = await this.ensureStructuredOutput(glosses, provider);
+      glosses = this.normalizeGlosses(glosses);
+      this.recordLog(runId, logs, "result", "Finished after reaching iteration limit", {
+        glossCount: glosses.length,
+        iterations,
+        toolCalls,
+      });
+
+      return {
+        glosses,
+        iterations,
+        toolCalls,
+        errors,
+        logs,
+        runId,
+      };
+    } finally {
+      emitRunCompletion(runId);
+    }
+  }
+
   private buildSystemPrompt(context: AgenticGenerationContext): string {
     return `You are an expert language learning content creator with access to a database of glosses.
 
@@ -377,12 +580,14 @@ Your task is to generate comprehensive understanding text challenges for a langu
 1. Use the analyzeSituationContext tool to understand the situation
 2. Use searchExistingGlosses and checkGlossExists to avoid duplicates
 3. Generate both direct vocabulary (isParaphrased: false) and descriptive glosses (isParaphrased: true)
-4. Before splitting any gloss, call analyzeGlossStructure with the gloss content. Reuse the provided structure or keep the gloss atomic based on the tool result.
-5. When a gloss should be split, build a 'contains' tree (usually 1 level deep) and reuse existing gloss IDs for each part when possible.
-6. Use getRelatedGlosses to build rich relationships beyond contains.
-7. Every gloss must have at least one translation in ${context.nativeLanguage}. When generating brand new glosses, include the translation text directly in your final JSON. Only call ensureGlossTranslations when you have the real database ID of an existing gloss and need to attach missing translations—never call it with placeholder IDs.
-8. Whenever you reuse an existing gloss (parent or contains), include its database ID in the final JSON under the field \`id\`. If you are creating a new gloss, omit \`id\` but provide the translation so it can be persisted.
-9. Aim for comprehensive coverage: basic vocabulary, idioms, variations, related concepts. No strict limit on count—generate until the situation is well-covered (typically 10-20 glosses).
+4. EFFICIENT WORKFLOW: After searching, decide which glosses to create, then analyze ALL of them in ONE iteration by calling analyzeGlossStructure multiple times in a single response. Then immediately return your final JSON in the NEXT iteration. Don't analyze one gloss per iteration.
+5. Before splitting any gloss, call analyzeGlossStructure with the gloss content. Reuse the provided structure or keep the gloss atomic based on the tool result.
+6. When a gloss should be split, build a 'contains' tree (usually 1 level deep) and reuse existing gloss IDs for each part when possible.
+7. Use getRelatedGlosses to build rich relationships beyond contains.
+8. CRITICAL: Every NEW gloss must have translation in ${context.nativeLanguage}. Include translation text directly in your final JSON output as the "translation" field. DO NOT call ensureGlossTranslations for new glosses - only call it when you have a real database ID of an existing gloss that needs translations added.
+9. For new glosses in your final output: Provide the translation text directly in the "translation" field. The backend will create the translation gloss automatically.
+10. Whenever you reuse an existing gloss (parent or contains), include its database ID in the final JSON under the field \`id\`. If you are creating a new gloss, omit \`id\` but provide the translation so it can be persisted.
+11. Aim for comprehensive coverage: basic vocabulary, idioms, variations, related concepts. No strict limit on count—generate until the situation is well-covered (typically 10-20 glosses).
 
 **Output Format**:
 When done, return a JSON object:
@@ -415,6 +620,161 @@ Target language: ${context.targetLanguage}
 Native language: ${context.nativeLanguage}${hints}
 
 Start by analyzing the situation context, then generate appropriate challenges.`;
+  }
+
+  private buildExpressionSystemPrompt(context: AgenticGenerationContext): string {
+    return `You are an expert language learning content creator with access to a database of glosses.
+
+Your task is to generate comprehensive expression challenges for a language learning situation.
+
+**Expression Challenges**: High-level communicative functions in ${context.nativeLanguage} that learners need to EXPRESS/SAY in ${context.targetLanguage} (what learners want to say, not what they need to understand).
+
+**Key Difference from Understanding**: Expression challenges are in the NATIVE language (${context.nativeLanguage}), and learners must translate TO the target language (${context.targetLanguage}).
+
+**Guidelines**:
+1. Use the analyzeSituationContext tool to understand the situation
+2. Use searchExistingGlosses extensively to find reusable glosses in ${context.nativeLanguage} for common concepts like "to understand", "to ask", "negation", etc.
+3. Focus on HIGH-LEVEL communicative functions (mostly isParaphrased: true):
+   - Examples: "express that you don't understand", "ask how much X costs", "apologize politely", "request directions to X"
+   - NOT single words like "hello" (unless part of a larger expression)
+4. EFFICIENT WORKFLOW: After searching, decide which glosses to create, then analyze ALL of them in ONE iteration by calling analyzeGlossStructure multiple times in a single response. Then immediately return your final JSON in the NEXT iteration. Don't analyze one gloss per iteration.
+5. Before splitting any gloss, call analyzeGlossStructure with the gloss content in ${context.nativeLanguage}. Reuse the provided structure or keep the gloss atomic based on the tool result.
+6. When a gloss should be split, build a 'contains' tree AND ensure the translation ALSO has a mirrored contains structure:
+   - Parent: "express you don't understand" (${context.nativeLanguage}) → translation: "expresar que no entiendes" (${context.targetLanguage})
+   - Parent contains: ["to understand", "negating a verb"] (${context.nativeLanguage})
+   - Translation MUST also contain: ["entender", "no (negación)"] (${context.targetLanguage})
+7. Use getRelatedGlosses to explore existing gloss trees and reuse entire subtrees when possible
+8. CRITICAL: Every NEW gloss must have translation in ${context.targetLanguage}. Include translation text directly in your final JSON output as the "translation" field. DO NOT call ensureGlossTranslations for new glosses - only call it when you have a real database ID of an existing gloss that needs translations added.
+9. For new glosses in your final output: Provide the translation text directly in the "translation" field. The backend will create the translation gloss automatically.
+10. Reuse aggressively: Common glosses like "to understand", "to ask", "yes/no", "negation" likely exist. Include their database IDs when reusing.
+11. Aim for 10-20 high-level expression challenges that cover typical communicative needs in this situation.
+
+**Translation Mirroring Example**:
+{
+  "content": "express you don't understand",
+  "language": "${context.nativeLanguage}",
+  "isParaphrased": true,
+  "translation": "expresar que no entiendes",
+  "contains": [
+    {
+      "content": "to understand",
+      "isParaphrased": false,
+      "translation": "entender"
+    },
+    {
+      "content": "negating a verb",
+      "isParaphrased": true,
+      "translation": "no (negación)"
+    }
+  ]
+}
+
+**Output Format**:
+When done, return a JSON object:
+{
+  "glosses": [
+    {
+      "content": "string (high-level expression in ${context.nativeLanguage})",
+      "isParaphrased": boolean,
+      "translation": "string (translation in ${context.targetLanguage})",
+      "transcriptions": ["phonetic for translation"],
+      "notes": [{ "noteType": "usage", "content": "...", "showBeforeSolution": false }],
+      "contains": [
+        {
+          "content": "sub-part in ${context.nativeLanguage}",
+          "isParaphrased": boolean,
+          "translation": "translation in ${context.targetLanguage}",
+          "contains": []
+        }
+      ]
+    }
+  ]
+}`;
+  }
+
+  private buildExpressionUserPrompt(context: AgenticGenerationContext): string {
+    const hints = context.userHints ? `\n\nUser hints: ${context.userHints}` : "";
+
+    return `Generate comprehensive expression challenges for situation: ${context.situationId}
+
+Target language: ${context.targetLanguage}
+Native language: ${context.nativeLanguage}${hints}
+
+Remember: Generate HIGH-LEVEL communicative functions in ${context.nativeLanguage} that learners need to express in ${context.targetLanguage}.
+Focus on practical expressions like "ask how to get to X", "express confusion", "request help", etc.
+
+Start by analyzing the situation context, then search for reusable glosses, then generate appropriate challenges.`;
+  }
+
+  private validateExpressionGlosses(
+    glosses: GlossPayload[],
+    context: AgenticGenerationContext
+  ): { valid: true } | { valid: false; feedback: string; issues: string[] } {
+    const issues: string[] = [];
+
+    for (const gloss of glosses) {
+      this.validateExpressionGlossPayload(gloss, context, issues, []);
+    }
+
+    if (issues.length === 0) {
+      return { valid: true };
+    }
+
+    const feedback =
+      "Some expression glosses failed validation:\n- " + issues.map(issue => issue.trim()).join("\n- ");
+    return { valid: false, feedback, issues };
+  }
+
+  private validateExpressionGlossPayload(
+    gloss: GlossPayload,
+    context: AgenticGenerationContext,
+    issues: string[],
+    lineage: string[]
+  ) {
+    const label = [...lineage, gloss.content].filter(Boolean).join(" > ") || gloss.content;
+
+    // For expression challenges, translation should be in TARGET language
+    if (!gloss.translation || gloss.translation.trim().length === 0) {
+      issues.push(`Provide a translation for "${label}" in ${context.targetLanguage}.`);
+    }
+
+    // Check structure cache (uses native language for expression challenges)
+    const key = this.getStructureKey(context.nativeLanguage, gloss.content);
+    const structure = key ? this.structureCache.get(key) : undefined;
+
+    if (!structure && gloss.contains && gloss.contains.length > 0) {
+      issues.push(`Call analyzeGlossStructure before splitting "${label}" into contains entries.`);
+    }
+
+    if (structure?.split) {
+      if (!gloss.contains || gloss.contains.length === 0) {
+        issues.push(
+          `Add contains entries for "${label}" based on analyzeGlossStructure suggestions.`
+        );
+      } else {
+        const childContents = new Set(
+          gloss.contains.map(child => child.content.trim())
+        );
+        for (const part of structure.parts) {
+          if (!childContents.has(part.content.trim())) {
+            issues.push(
+              `The contains list for "${label}" must include "${part.content}" as suggested by analyzeGlossStructure.`
+            );
+          }
+        }
+      }
+    }
+
+    if (gloss.contains && gloss.contains.length > 0) {
+      for (const child of gloss.contains) {
+        if (!child.id && (!child.translation || child.translation.trim().length === 0)) {
+          issues.push(
+            `Either reference an existing gloss ID or provide a translation so "${child.content}" can be created.`
+          );
+        }
+        this.validateExpressionGlossPayload(child, context, issues, [...lineage, gloss.content]);
+      }
+    }
   }
 
   private extractGlossesFromResponse(content: string): GlossPayload[] {

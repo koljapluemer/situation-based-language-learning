@@ -10,6 +10,7 @@ import { useModalEditSituation } from "../../features/situation-edit/index";
 import GlossModal from "../../features/gloss-manage/GlossModal.vue";
 import GlossTreeNode from "../../features/gloss-tree/GlossTreeNode.vue";
 import ModalGenerateUnderstandingChallenges from "../../features/ai-challenges/ModalGenerateUnderstandingChallenges.vue";
+import ModalGenerateExpressionChallenges from "../../features/ai-challenges/ModalGenerateExpressionChallenges.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -22,6 +23,7 @@ const situationId = route.params.id as string;
 const showGlossModalExpression = ref(false);
 const showGlossModalUnderstanding = ref(false);
 const showAIGenerateModal = ref(false);
+const showAIGenerateExpressionModal = ref(false);
 const expressionSectionOpen = ref(true);
 const understandingSectionOpen = ref(true);
 
@@ -84,10 +86,20 @@ function openAIGenerateModal() {
   showAIGenerateModal.value = true;
 }
 
+function openAIGenerateExpressionModal() {
+  showAIGenerateExpressionModal.value = true;
+}
+
 function handleAIGenerated() {
   queryClient.invalidateQueries({ queryKey: ["situation", situationId] });
   showAIGenerateModal.value = false;
   toast.success("AI-generated challenges added successfully");
+}
+
+function handleAIGeneratedExpression() {
+  queryClient.invalidateQueries({ queryKey: ["situation", situationId] });
+  showAIGenerateExpressionModal.value = false;
+  toast.success("AI-generated expression challenges added successfully");
 }
 
 async function handleGlossAdded(gloss: GlossDTO, type: "expression" | "understanding") {
@@ -323,10 +335,14 @@ function handleGlossChanged() {
                 </div>
               </div>
 
-              <div>
+              <div class="flex gap-2">
                 <button @click="openGlossModalExpression" class="btn btn-outline btn-sm gap-2" type="button">
                   <Plus :size="16" />
                   Add expression gloss
+                </button>
+                <button @click="openAIGenerateExpressionModal" class="btn btn-primary btn-sm gap-2" type="button">
+                  <Sparkles :size="16" />
+                  Generate with AI
                 </button>
               </div>
             </div>
@@ -421,6 +437,15 @@ function handleGlossChanged() {
       :native-language="situation.nativeLanguage"
       @close="showAIGenerateModal = false"
       @saved="handleAIGenerated"
+    />
+
+    <ModalGenerateExpressionChallenges
+      v-if="situation"
+      :show="showAIGenerateExpressionModal"
+      :situation="situation"
+      :native-language="situation.nativeLanguage"
+      @close="showAIGenerateExpressionModal = false"
+      @saved="handleAIGeneratedExpression"
     />
 
     <ModalEditSituation @update="handleUpdateSituation" />

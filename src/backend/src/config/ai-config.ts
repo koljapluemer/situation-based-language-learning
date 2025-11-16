@@ -34,7 +34,7 @@ export const AI_CONFIG = {
      * Maximum number of agent iterations before terminating
      * Each iteration can include multiple LLM calls (agent + tools)
      */
-    maxIterations: 5,
+    maxIterations: 15,
 
     /**
      * Target number of glosses to generate

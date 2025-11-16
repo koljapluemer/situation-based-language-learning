@@ -121,39 +121,108 @@ export function registerAIChallengeRoutes(app: FastifyInstance) {
   });
 
   /**
+   * POST /ai/generate-expression-challenges/agentic
+   *
+   * Generate expression challenges using agentic mode (tool-using agent).
+   * Creates high-level communicative functions in native language that learners
+   * need to express in target language.
+   */
+  app.post("/ai/generate-expression-challenges/agentic", async (request, reply) => {
+    try {
+      const payload = generateChallengesRequestSchema.parse(request.body);
+
+      // Build context
+      const context: AgenticGenerationContext = {
+        situationId: payload.situationId,
+        targetLanguage: payload.targetLanguage,
+        nativeLanguage: payload.nativeLanguage,
+        userHints: payload.userHints,
+        provider: payload.provider,
+        runId: payload.runId,
+      };
+
+      // Generate with agentic mode
+      const generator = new AgenticGenerator(glossService, situationService);
+      const result = await generator.generateExpressionChallenges(context);
+
+      // Check for duplicates (in native language for expression challenges)
+      const duplicates = await glossCreationHelper.findDuplicates(
+        result.glosses,
+        payload.nativeLanguage
+      );
+
+      return reply.code(200).send({
+        success: true,
+        glosses: result.glosses,
+        duplicates,
+        metadata: {
+          mode: "agentic",
+          provider: context.provider ?? AI_CONFIG.provider,
+          runId: result.runId,
+          iterations: result.iterations,
+          toolCalls: result.toolCalls,
+          count: result.glosses.length,
+          errors: result.errors,
+          logs: result.logs,
+        },
+      });
+    } catch (error) {
+      request.log.error(error, "Agentic expression generation failed");
+      const message = error instanceof Error ? error.message : "Unknown error";
+      const stack = error instanceof Error ? error.stack : undefined;
+      return reply.code(500).send({
+        success: false,
+        error: message,
+        details: stack,
+      });
+    }
+  });
+
+  /**
    * POST /situations/:id/save-generated-challenges
    *
    * Save selected generated challenges to a situation.
    * Creates glosses with recursive contains relationships and attaches them
-   * to the situation's challengesOfUnderstandingText array.
+   * to either challengesOfExpression or challengesOfUnderstandingText array.
    */
   app.post("/situations/:id/save-generated-challenges", async (request, reply) => {
     try {
       const { id } = paramsSchema.parse(request.params);
       const payload = saveChallengesRequestSchema.parse(request.body);
 
-      // Fetch situation to get target language
+      // Fetch situation to get languages
       const situation = await situationService.findById(id, {});
       const targetLanguage = situation.targetLanguage as LanguageCode;
+      const challengeType = payload.challengeType || "understanding";
+
+      // For expression: glosses are in native language
+      // For understanding: glosses are in target language
+      const glossLanguage = challengeType === "expression"
+        ? payload.nativeLanguage
+        : targetLanguage;
 
       // Create glosses with recursive contains and translations
       const createdGlossIds = await glossCreationHelper.createMultipleGlossesWithTranslations(
         payload.selectedGlosses,
-        targetLanguage,
+        glossLanguage,
         payload.nativeLanguage
       );
 
-      // Get existing understanding challenge IDs
-      const existingIds = situation.challengesOfUnderstandingText.map(g => g.id);
+      // Get existing challenge IDs based on type
+      const existingIds = challengeType === "expression"
+        ? situation.challengesOfExpression.map(g => g.id)
+        : situation.challengesOfUnderstandingText.map(g => g.id);
 
       // Merge with new IDs (avoid duplicates)
       const allIds = [...existingIds, ...createdGlossIds];
       const uniqueIds = Array.from(new Set(allIds));
 
-      // Update situation
-      const updated = await situationService.update(id, {
-        challengesOfUnderstandingTextIds: uniqueIds,
-      });
+      // Update situation with appropriate field
+      const updateData = challengeType === "expression"
+        ? { challengesOfExpressionIds: uniqueIds }
+        : { challengesOfUnderstandingTextIds: uniqueIds };
+
+      const updated = await situationService.update(id, updateData);
 
       return reply.code(200).send({
         success: true,
@@ -161,6 +230,7 @@ export function registerAIChallengeRoutes(app: FastifyInstance) {
         metadata: {
           createdCount: createdGlossIds.length,
           totalChallenges: uniqueIds.length,
+          challengeType,
         },
       });
     } catch (error) {

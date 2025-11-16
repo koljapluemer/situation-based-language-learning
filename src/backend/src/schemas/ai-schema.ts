@@ -63,6 +63,7 @@ export const glossPayloadSchema: z.ZodType<GlossPayload> = z.lazy(() =>
 export const saveChallengesRequestSchema = z.object({
   selectedGlosses: z.array(glossPayloadSchema),
   nativeLanguage: languageCodeSchema,
+  challengeType: z.enum(["expression", "understanding"]).optional(),
 });
 
 /**
