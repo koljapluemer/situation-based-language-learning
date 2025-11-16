@@ -201,11 +201,17 @@ export function registerAIChallengeRoutes(app: FastifyInstance) {
         ? payload.nativeLanguage
         : targetLanguage;
 
+      // For expression: translations are in target language
+      // For understanding: translations are in native language
+      const translationLanguage = challengeType === "expression"
+        ? targetLanguage
+        : payload.nativeLanguage;
+
       // Create glosses with recursive contains and translations
       const createdGlossIds = await glossCreationHelper.createMultipleGlossesWithTranslations(
         payload.selectedGlosses,
         glossLanguage,
-        payload.nativeLanguage
+        translationLanguage
       );
 
       // Get existing challenge IDs based on type

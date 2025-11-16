@@ -631,6 +631,15 @@ Your task is to generate comprehensive expression challenges for a language lear
 
 **Key Difference from Understanding**: Expression challenges are in the NATIVE language (${context.nativeLanguage}), and learners must translate TO the target language (${context.targetLanguage}).
 
+**CRITICAL - Translation Strategy**:
+- Native glosses are often PARAPHRASED (e.g., "apologize for being late")
+- Translations must be ACTUAL NATURAL EXPRESSIONS in ${context.targetLanguage}, NOT literal translations of the paraphrase
+- Examples:
+  * "apologize for being late" → "Tut mir leid, ich bin zu spät" (NOT "entschuldige dafür, zu spät zu sein")
+  * "ask where the bathroom is" → "Wo ist die Toilette?" (NOT "frage wo das Badezimmer ist")
+  * "express confusion" → "Ich verstehe nicht" or "Was?" (NOT "Verwirrung ausdrücken")
+- The translation should be what a NATIVE SPEAKER would actually say in that situation
+
 **Guidelines**:
 1. Use the analyzeSituationContext tool to understand the situation
 2. Use searchExistingGlosses extensively to find reusable glosses in ${context.nativeLanguage} for common concepts like "to understand", "to ask", "negation", etc.
@@ -640,31 +649,52 @@ Your task is to generate comprehensive expression challenges for a language lear
 4. EFFICIENT WORKFLOW: After searching, decide which glosses to create, then analyze ALL of them in ONE iteration by calling analyzeGlossStructure multiple times in a single response. Then immediately return your final JSON in the NEXT iteration. Don't analyze one gloss per iteration.
 5. Before splitting any gloss, call analyzeGlossStructure with the gloss content in ${context.nativeLanguage}. Reuse the provided structure or keep the gloss atomic based on the tool result.
 6. When a gloss should be split, build a 'contains' tree AND ensure the translation ALSO has a mirrored contains structure:
-   - Parent: "express you don't understand" (${context.nativeLanguage}) → translation: "expresar que no entiendes" (${context.targetLanguage})
+   - Parent: "express you don't understand" (${context.nativeLanguage}) → translation: ACTUAL natural expression like "Ich verstehe nicht" (${context.targetLanguage})
    - Parent contains: ["to understand", "negating a verb"] (${context.nativeLanguage})
-   - Translation MUST also contain: ["entender", "no (negación)"] (${context.targetLanguage})
+   - Each child also needs NATURAL translations: "to understand" → "verstehen", "negating a verb" → "nicht" (the actual negation particle)
+   - The translation's contains should mirror the structure but use NATURAL target language forms
 7. Use getRelatedGlosses to explore existing gloss trees and reuse entire subtrees when possible
 8. CRITICAL: Every NEW gloss must have translation in ${context.targetLanguage}. Include translation text directly in your final JSON output as the "translation" field. DO NOT call ensureGlossTranslations for new glosses - only call it when you have a real database ID of an existing gloss that needs translations added.
 9. For new glosses in your final output: Provide the translation text directly in the "translation" field. The backend will create the translation gloss automatically.
 10. Reuse aggressively: Common glosses like "to understand", "to ask", "yes/no", "negation" likely exist. Include their database IDs when reusing.
 11. Aim for 10-20 high-level expression challenges that cover typical communicative needs in this situation.
 
-**Translation Mirroring Example**:
+**Translation Mirroring Example** (German):
 {
   "content": "express you don't understand",
-  "language": "${context.nativeLanguage}",
+  "language": "eng",
   "isParaphrased": true,
-  "translation": "expresar que no entiendes",
+  "translation": "Ich verstehe nicht",  // ACTUAL natural German, NOT literal translation
   "contains": [
     {
       "content": "to understand",
       "isParaphrased": false,
-      "translation": "entender"
+      "translation": "verstehen"  // Natural German verb
     },
     {
       "content": "negating a verb",
       "isParaphrased": true,
-      "translation": "no (negación)"
+      "translation": "nicht"  // The actual German negation particle, NOT a description
+    }
+  ]
+}
+
+**Translation Mirroring Example** (Arabic):
+{
+  "content": "ask for the train schedule",
+  "language": "eng",
+  "isParaphrased": true,
+  "translation": "متى القطار؟",  // ACTUAL natural Arabic question, NOT literal translation
+  "contains": [
+    {
+      "content": "ask for",
+      "isParaphrased": true,
+      "translation": "متى"  // Natural Arabic question word (when)
+    },
+    {
+      "content": "train",
+      "isParaphrased": false,
+      "translation": "القطار"  // Natural Arabic noun
     }
   ]
 }
@@ -676,20 +706,22 @@ When done, return a JSON object:
     {
       "content": "string (high-level expression in ${context.nativeLanguage})",
       "isParaphrased": boolean,
-      "translation": "string (translation in ${context.targetLanguage})",
+      "translation": "NATURAL expression native speakers actually say in ${context.targetLanguage} - NOT a literal translation!",
       "transcriptions": ["phonetic for translation"],
       "notes": [{ "noteType": "usage", "content": "...", "showBeforeSolution": false }],
       "contains": [
         {
           "content": "sub-part in ${context.nativeLanguage}",
           "isParaphrased": boolean,
-          "translation": "translation in ${context.targetLanguage}",
+          "translation": "NATURAL ${context.targetLanguage} word/phrase - NOT literal translation!",
           "contains": []
         }
       ]
     }
   ]
-}`;
+}
+
+REMEMBER: Translations must be what native speakers ACTUALLY SAY, not literal translations of paraphrased descriptions!`;
   }
 
   private buildExpressionUserPrompt(context: AgenticGenerationContext): string {
