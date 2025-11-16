@@ -2,6 +2,7 @@
 import { ref, watch } from "vue";
 import type { LocalizedString } from "@sbl/shared";
 import { useModalEditSituation } from "./index";
+import LanguageSelect from "../../dumb/LanguageSelect.vue";
 
 const { isOpen, currentSituation, close } = useModalEditSituation();
 
@@ -76,16 +77,11 @@ function handleModalClose() {
                 :key="index"
                 class="flex gap-2 items-start"
               >
-                <select
+                <LanguageSelect
                   v-model="desc.language"
-                  class="select select-bordered w-24"
+                  class="select-bordered w-40"
                   :disabled="isSubmitting"
-                >
-                  <option value="eng">eng</option>
-                  <option value="spa">spa</option>
-                  <option value="deu">deu</option>
-                  <option value="fra">fra</option>
-                </select>
+                />
                 <input
                   :value="desc.content"
                   @input="updateDescription(index, ($event.target as HTMLInputElement).value)"
