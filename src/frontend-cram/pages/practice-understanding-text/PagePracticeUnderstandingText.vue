@@ -16,6 +16,7 @@ const route = useRoute();
 const router = useRouter();
 
 const situationId = route.params.situationId as string;
+const challengeGlossId = route.query.challengeGlossId as string | undefined;
 
 // Data loading state
 const allGlosses = ref<Map<string, GlossEntity>>(new Map());
@@ -137,15 +138,26 @@ function selectNextGloss(): GlossEntity | null {
 async function generateNextTask() {
   // If all glosses are ready, present final challenge
   if (allGlossesReady.value) {
-    // Pick a random challenge gloss for the final test
-    const randomIndex = Math.floor(Math.random() * challengeGlossIds.value.length);
-    const challengeGlossId = challengeGlossIds.value[randomIndex];
-    const gloss = allGlosses.value.get(challengeGlossId);
-
-    if (gloss) {
-      currentTask.value = generateGuessWhatGlossMeans(gloss);
+    // Use the challenge gloss ID from the URL
+    if (!challengeGlossId) {
+      error.value = 'No challenge gloss ID specified in URL';
       return;
     }
+
+    const gloss = allGlosses.value.get(challengeGlossId);
+
+    if (!gloss) {
+      error.value = `Challenge gloss "${challengeGlossId}" not found`;
+      return;
+    }
+
+    if (!challengeGlossIds.value.includes(challengeGlossId)) {
+      error.value = `Gloss "${challengeGlossId}" is not a valid challenge for this situation`;
+      return;
+    }
+
+    currentTask.value = generateGuessWhatGlossMeans(gloss);
+    return;
   }
 
   // Select next gloss to practice

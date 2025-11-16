@@ -128,8 +128,32 @@ async function handlePractice(id: string) {
     }
   }
 
-  // Navigate to practice
-  router.push({ name: 'practice-understanding-text', params: { situationId: id } });
+  // Fetch the full situation to get challenge gloss IDs
+  const fullSituation = await situationExists(id) ? await (async () => {
+    const { getSituation } = await import('../../entities/situation');
+    return getSituation(id);
+  })() : null;
+
+  if (!fullSituation || !fullSituation.challengesOfUnderstandingTextIds || fullSituation.challengesOfUnderstandingTextIds.length === 0) {
+    error.value = 'No understanding text challenges available for this situation';
+    return;
+  }
+
+  // Randomly select a challenge gloss ID
+  const randomIndex = Math.floor(Math.random() * fullSituation.challengesOfUnderstandingTextIds.length);
+  const challengeGlossId = fullSituation.challengesOfUnderstandingTextIds[randomIndex];
+
+  // Navigate to practice with the randomly selected challenge
+  router.push({
+    name: 'practice',
+    params: {
+      mode: 'understanding-text',
+      situationId: id
+    },
+    query: {
+      challengeGlossId
+    }
+  });
 }
 
 // Download all situations for current language

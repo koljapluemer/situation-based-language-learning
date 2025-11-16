@@ -23,8 +23,8 @@ const router = createRouter({
       component: PageSituations
     },
     {
-      path: '/practice-understanding-text/:situationId',
-      name: 'practice-understanding-text',
+      path: '/practice/:mode/:situationId',
+      name: 'practice',
       component: PagePracticeUnderstandingText
     },
   ]

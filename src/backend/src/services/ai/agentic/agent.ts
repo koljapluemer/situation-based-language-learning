@@ -74,6 +74,7 @@ function buildStructuredGlossSchema(depth = 2): ObjectSchema {
   const schema: ObjectSchema & { additionalProperties?: boolean } = {
     type: SchemaType.OBJECT,
     properties: {
+      id: { type: SchemaType.STRING },
       content: { type: SchemaType.STRING },
       isParaphrased: { type: SchemaType.BOOLEAN },
       translation: { type: SchemaType.STRING },
@@ -288,6 +289,7 @@ export class AgenticGenerator {
             // Try to parse JSON from the response
           let glosses = this.extractGlossesFromResponse(content);
           glosses = await this.ensureStructuredOutput(glosses, provider);
+          glosses = this.normalizeGlosses(glosses);
           const validation = this.validateGlosses(glosses, context);
             if (validation.valid) {
               this.recordLog(runId, logs, "result", "Agent returned final response", {
@@ -344,6 +346,7 @@ export class AgenticGenerator {
           ? this.extractGlossesFromResponse(lastMessage.content)
           : [];
       glosses = await this.ensureStructuredOutput(glosses, provider);
+      glosses = this.normalizeGlosses(glosses);
       this.recordLog(runId, logs, "result", "Finished after reaching iteration limit", {
         glossCount: glosses.length,
         iterations,
@@ -617,6 +620,32 @@ Start by analyzing the situation context, then generate appropriate challenges.`
     }
   }
 
+  private normalizeGlosses(glosses: GlossPayload[]): GlossPayload[] {
+    return glosses.map(gloss => this.normalizeGloss(gloss));
+  }
+
+  private normalizeGloss(gloss: GlossPayload): GlossPayload {
+    const normalizedContains = this.normalizeGlosses(gloss.contains ?? []);
+    return {
+      ...gloss,
+      transcriptions: Array.isArray(gloss.transcriptions)
+        ? gloss.transcriptions
+            .map(value => (typeof value === "string" ? value.trim() : ""))
+            .filter(value => value.length > 0)
+        : [],
+      notes: Array.isArray(gloss.notes)
+        ? gloss.notes.map(note => ({
+            noteType: typeof note.noteType === "string" && note.noteType.trim().length > 0
+              ? note.noteType
+              : "usage",
+            content: typeof note.content === "string" ? note.content : "",
+            showBeforeSolution: Boolean(note.showBeforeSolution),
+          }))
+        : [],
+      contains: normalizedContains,
+    };
+  }
+
   private async ensureStructuredOutput(
     glosses: GlossPayload[],
     provider: AIProvider
@@ -702,7 +731,7 @@ Start by analyzing the situation context, then generate appropriate challenges.`
     };
   }
 
-  private buildOpenAIGlossSchema(depth = 2) {
+  private buildOpenAIGlossSchema(depth = 2): any {
     const noteSchema = {
       type: "object",
       properties: {
@@ -714,42 +743,55 @@ Start by analyzing the situation context, then generate appropriate challenges.`
       required: ["noteType", "content", "showBeforeSolution"],
     };
 
-    const schema: any = {
+    const baseProperties = {
+      content: { type: "string" },
+      isParaphrased: { type: "boolean" },
+      translation: { type: "string" },
+      transcriptions: {
+        type: "array",
+        items: { type: "string" },
+      },
+      notes: {
+        type: "array",
+        items: noteSchema,
+      },
+    };
+    const requiredKeys = Object.keys(baseProperties);
+
+    const containsProperty =
+      depth > 0
+        ? {
+            type: "array",
+            items: this.buildOpenAIGlossSchema(depth - 1),
+          }
+        : {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {},
+              additionalProperties: false,
+              required: [],
+            },
+          };
+
+    const buildVariant = (includeId: boolean) => ({
       type: "object",
       properties: {
-        content: { type: "string" },
-        isParaphrased: { type: "boolean" },
-        translation: { type: "string" },
-        transcriptions: {
-          type: "array",
-          items: { type: "string" },
-        },
-        notes: {
-          type: "array",
-          items: noteSchema,
-        },
+        ...(includeId ? { id: { type: "string" } } : {}),
+        ...baseProperties,
+        contains: containsProperty,
       },
       additionalProperties: false,
-      required: ["content", "isParaphrased", "translation", "transcriptions", "notes"],
+      required: [
+        ...(includeId ? ["id"] : []),
+        ...requiredKeys,
+        "contains",
+      ],
+    });
+
+    return {
+      anyOf: [buildVariant(true), buildVariant(false)],
     };
-
-    schema.properties.contains = depth > 0
-      ? {
-          type: "array",
-          items: this.buildOpenAIGlossSchema(depth - 1),
-        }
-      : {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {},
-            additionalProperties: false,
-            required: [],
-          },
-        };
-
-    schema.required.push("contains");
-    return schema;
   }
 }
 
