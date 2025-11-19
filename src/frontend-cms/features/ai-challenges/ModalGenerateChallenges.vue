@@ -4,6 +4,7 @@ import { Sparkles, Trash2, AlertCircle } from "lucide-vue-next";
 import type { SituationDTO, LanguageCode } from "@sbl/shared";
 import { useToast } from "../../dumb/toasts/index";
 import ModalAgentRunLog from "./ModalAgentRunLog.vue";
+import { apiFetch } from "../../app/lib/api-client";
 
 interface GlossPayload {
   id?: string;
@@ -51,7 +52,6 @@ const emit = defineEmits<{
 }>();
 
 const toast = useToast();
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3333";
 
 // Computed labels based on challenge type
 const modalTitle = computed(() =>
@@ -177,9 +177,8 @@ async function handleGenerate() {
       provider: provider.value,
     };
 
-    const response = await fetch(`${API_BASE_URL}${apiEndpoint.value}`, {
+    const response = await apiFetch(apiEndpoint.value, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 

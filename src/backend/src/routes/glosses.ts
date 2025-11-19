@@ -7,6 +7,7 @@ import {
   glossUpdateSchema,
   glossWriteSchema,
 } from "../schemas/gloss-schema";
+import { authenticateRequest } from "../middleware/supabase-auth";
 
 const paramsSchema = z.object({ id: z.string().cuid() });
 const service = new GlossService();
@@ -34,22 +35,31 @@ export function registerGlossRoutes(app: FastifyInstance) {
     return { data: await service.referenceSummary(id) };
   });
 
-  app.post("/glosses", async (request, reply) => {
-    const payload = glossWriteSchema.parse(request.body);
-    const gloss = await service.create(payload);
-    return reply.code(201).send({ data: gloss });
+  app.post("/glosses", {
+    preHandler: authenticateRequest,
+    handler: async (request, reply) => {
+      const payload = glossWriteSchema.parse(request.body);
+      const gloss = await service.create(payload);
+      return reply.code(201).send({ data: gloss });
+    }
   });
 
-  app.patch("/glosses/:id", async (request) => {
-    const { id } = paramsSchema.parse(request.params);
-    const payload = glossUpdateSchema.parse(request.body);
-    const gloss = await service.update(id, payload);
-    return { data: gloss };
+  app.patch("/glosses/:id", {
+    preHandler: authenticateRequest,
+    handler: async (request) => {
+      const { id } = paramsSchema.parse(request.params);
+      const payload = glossUpdateSchema.parse(request.body);
+      const gloss = await service.update(id, payload);
+      return { data: gloss };
+    }
   });
 
-  app.delete("/glosses/:id", async (request, reply) => {
-    const { id } = paramsSchema.parse(request.params);
-    await service.delete(id);
-    return reply.code(204).send();
+  app.delete("/glosses/:id", {
+    preHandler: authenticateRequest,
+    handler: async (request, reply) => {
+      const { id } = paramsSchema.parse(request.params);
+      await service.delete(id);
+      return reply.code(204).send();
+    }
   });
 }

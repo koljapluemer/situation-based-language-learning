@@ -5,8 +5,7 @@ import { Eye } from "lucide-vue-next";
 import ModalCreateSituation from "../../features/situation-create/ModalCreateSituation.vue";
 import { useModalCreateSituation } from "../../features/situation-create/index";
 import { useToast } from "../../dumb/toasts/index";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3333";
+import { apiPublicFetch, apiFetch } from "../../app/lib/api-client";
 
 const situations = ref<SituationDTO[]>([]);
 const isLoading = ref(true);
@@ -28,7 +27,7 @@ async function loadSituations() {
   errorMessage.value = null;
 
   try {
-    const response = await fetch(`${API_BASE_URL}/situations`);
+    const response = await apiPublicFetch('/situations');
     if (!response.ok) {
       throw new Error(`Request failed with status ${response.status}`);
     }
@@ -45,11 +44,8 @@ async function loadSituations() {
 
 async function handleCreateSituation(description: string, targetLanguage: LanguageCode, nativeLanguage: LanguageCode, imageLink?: string) {
   try {
-    const response = await fetch(`${API_BASE_URL}/situations`, {
+    const response = await apiFetch('/situations', {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify({
         descriptions: [
           {

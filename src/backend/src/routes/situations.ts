@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { SituationService } from "../services/situation-service";
 import { situationQuerySchema, situationUpdateSchema, situationWriteSchema } from "../schemas/situation-schema";
+import { authenticateRequest } from "../middleware/supabase-auth";
 
 const paramsSchema = z.object({ id: z.string().min(1) }); // situation id (cuid string or seed-provided id)
 const service = new SituationService();
@@ -23,23 +24,32 @@ export function registerSituationRoutes(app: FastifyInstance) {
     return { data: await service.findById(id, query) };
   });
 
-  app.post("/situations", async (request, reply) => {
-    const payload = situationWriteSchema.parse(request.body);
-    const situation = await service.create(payload);
-    return reply.code(201).send({ data: situation });
+  app.post("/situations", {
+    preHandler: authenticateRequest,
+    handler: async (request, reply) => {
+      const payload = situationWriteSchema.parse(request.body);
+      const situation = await service.create(payload);
+      return reply.code(201).send({ data: situation });
+    }
   });
 
-  app.patch("/situations/:id", async (request) => {
-    const { id } = paramsSchema.parse(request.params);
-    const payload = situationUpdateSchema.parse(request.body);
-    return {
-      data: await service.update(id, payload),
-    };
+  app.patch("/situations/:id", {
+    preHandler: authenticateRequest,
+    handler: async (request) => {
+      const { id} = paramsSchema.parse(request.params);
+      const payload = situationUpdateSchema.parse(request.body);
+      return {
+        data: await service.update(id, payload),
+      };
+    }
   });
 
-  app.delete("/situations/:id", async (request, reply) => {
-    const { id } = paramsSchema.parse(request.params);
-    await service.delete(id);
-    return reply.code(204).send();
+  app.delete("/situations/:id", {
+    preHandler: authenticateRequest,
+    handler: async (request, reply) => {
+      const { id } = paramsSchema.parse(request.params);
+      await service.delete(id);
+      return reply.code(204).send();
+    }
   });
 }

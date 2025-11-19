@@ -1,12 +1,44 @@
 <script setup lang="ts">
+import { useRouter, useRoute } from 'vue-router';
+import { LogOut } from 'lucide-vue-next';
 import ToastContainer from '../dumb/toasts/ToastContainer.vue';
+import { useAuth } from './composables/useAuth';
+
+const router = useRouter();
+const route = useRoute();
+const { signOut, user } = useAuth();
+
+const handleLogout = async () => {
+  await signOut();
+  router.push('/login');
+};
+
+const isLoginPage = () => route.name === 'login';
 </script>
 
 <template>
-  <main class="prose mx-auto flex-1 container flex flex-col gap-4 my-2">
-    <router-view />
-  </main>
-  <ToastContainer />
+  <div class="min-h-screen flex flex-col">
+    <!-- Header with logout button -->
+    <header v-if="!isLoginPage() && user" class="navbar bg-base-300 px-4">
+      <div class="flex-1">
+        <span class="text-xl font-bold">CMS</span>
+      </div>
+      <div class="flex-none gap-2">
+        <span class="text-sm">{{ user.email }}</span>
+        <button class="btn btn-sm btn-ghost" @click="handleLogout">
+          <LogOut :size="16" />
+          Logout
+        </button>
+      </div>
+    </header>
+
+    <!-- Main content -->
+    <main class="prose mx-auto flex-1 container flex flex-col gap-4 my-2">
+      <router-view />
+    </main>
+
+    <ToastContainer />
+  </div>
 </template>
 
 <style>

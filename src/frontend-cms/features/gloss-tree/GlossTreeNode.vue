@@ -6,8 +6,7 @@ import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-vue-n
 import { useToast } from "../../dumb/toasts";
 import GlossModal from "../gloss-manage/GlossModal.vue";
 import type { GlossDTO, GlossReference, LanguageCode } from "@sbl/shared";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3333";
+import { apiPublicFetch, apiFetch } from "../../app/lib/api-client";
 const props = defineProps<{
   gloss: GlossDTO;
   depth?: number;
@@ -134,7 +133,7 @@ async function handleDeleteSelf() {
       : "Delete this gloss? This cannot be undone.";
     if (!confirm(message)) return;
 
-    const response = await fetch(`${API_BASE_URL}/glosses/${localGloss.value.id}`, {
+    const response = await apiFetch(`/glosses/${localGloss.value.id}`, {
       method: "DELETE",
     });
     if (!response.ok) {
@@ -254,7 +253,7 @@ async function preloadChildGlosses() {
 }
 
 async function fetchGloss(id: string): Promise<GlossDTO> {
-  const response = await fetch(`${API_BASE_URL}/glosses/${id}`);
+  const response = await apiPublicFetch(`/glosses/${id}`);
   if (!response.ok) {
     throw new Error(`Failed to load gloss: ${response.status}`);
   }
@@ -273,9 +272,8 @@ async function updateRelations(type: RelationType, ids: string[]) {
   const payload: Record<string, string[]> = {
     [relationFieldMap[type]]: ids,
   };
-  const response = await fetch(`${API_BASE_URL}/glosses/${localGloss.value.id}`, {
+  const response = await apiFetch(`/glosses/${localGloss.value.id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
@@ -305,7 +303,7 @@ function handleModalClose() {
 }
 
 async function fetchReferenceSummary(glossId: string) {
-  const response = await fetch(`${API_BASE_URL}/glosses/${glossId}/references`);
+  const response = await apiPublicFetch(`/glosses/${glossId}/references`);
   if (!response.ok) {
     throw new Error(`Failed to load references: ${response.status}`);
   }

@@ -22,6 +22,8 @@ This repository now uses **plain npm workspaces** to keep the backend, multiple 
    ```bash
    cp src/backend/.env.example src/backend/.env
    ```
+   Then add your Supabase credentials (see [Authentication Setup](#authentication) below).
+
 3. **Start Postgres locally (optional but easiest)**:
    ```bash
    docker compose -f src/backend/docker-compose.yml up -d
@@ -59,27 +61,48 @@ Shared DTO Library:
 
 - `src/shared` now has its own package manifest (`@sbl/shared`), build pipeline, and index barrel so that all apps import the same compiled TypeScript definitions (emitted into `src/shared/dist`). Use `npm run shared:dev` if you want the shared types to rebuild on save while developing.
 
+## Authentication
+
+This project uses **Supabase Auth** (authentication only, not their database) to protect write operations.
+
+- **Frontend-CMS**: Requires login for all access (POST/PATCH/DELETE operations)
+- **Frontend-CRAM**: Public access (GET requests only)
+- **Backend**: Validates Supabase JWT tokens via `Authorization: Bearer <token>` header
+
+**Setup:**
+1. See `SUPABASE_AUTH_SETUP.md` for complete instructions
+2. Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to `src/backend/.env`
+3. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to `src/frontend-cms/.env`
+4. Create admin user in Supabase dashboard
+
+**Quick test:** After setup, go to `http://localhost:4173` (CMS) - you'll be redirected to login.
+
 ## Backend Notes
 
-- **Stack:** Fastify 5, Prisma ORM, PostgreSQL, Zod validation, Dockerized for production.
+- **Stack:** Fastify 5, Prisma ORM, PostgreSQL, Zod validation, Supabase Auth, Dockerized for production.
+- **Authentication:** Supabase JWT verification on write operations (POST/PATCH/DELETE). GET requests remain public.
 - **Recursive DTO rules:** `contains` glosses resolve infinitely; `nearSynonyms`, `nearHomophones`, and `translations` resolve depth-1.
 - **Challenges:** `ChallengeOfExpression` / `ChallengeOfUnderstandingText` stored as first-class tables and returned with resolved gloss payloads.
 
 ### REST Surface (`http://localhost:3333`)
 
-| Method | Path | Notes |
-| --- | --- | --- |
-| GET | `/health` | readiness probe |
-| GET | `/glosses` | optional `language`, `content` filters |
-| POST | `/glosses` | create gloss + relationships via IDs |
-| GET | `/glosses/:id` | returns fully resolved `GlossDTO` |
-| PATCH | `/glosses/:id` | partial updates, arrays replace previous values |
-| DELETE | `/glosses/:id` | remove gloss |
-| GET | `/situations?language=deu` | language param required for DTO projection |
-| GET | `/situations/:id?language=deu` | fetch resolved situation |
-| POST | `/situations` | create situation + challenges |
-| PATCH | `/situations/:id?language=deu` | replace any provided challenge arrays |
-| DELETE | `/situations/:id` | cascades to its challenges |
+See `src/backend/API.md` for complete documentation.
+
+| Method | Path | Auth Required | Notes |
+| --- | --- | --- | --- |
+| GET | `/health` | No | readiness probe |
+| GET | `/glosses` | No | optional `language`, `content` filters |
+| POST | `/glosses` | **Yes** | create gloss + relationships via IDs |
+| GET | `/glosses/:id` | No | returns fully resolved `GlossDTO` |
+| PATCH | `/glosses/:id` | **Yes** | partial updates, arrays replace previous values |
+| DELETE | `/glosses/:id` | **Yes** | remove gloss |
+| GET | `/situations?language=deu` | No | language param optional for filtering |
+| GET | `/situations/:id?language=deu` | No | fetch resolved situation |
+| POST | `/situations` | **Yes** | create situation + challenges |
+| PATCH | `/situations/:id?language=deu` | **Yes** | replace any provided challenge arrays |
+| DELETE | `/situations/:id` | **Yes** | cascades to its challenges |
+
+**Auth:** Protected routes require `Authorization: Bearer <supabase-jwt-token>` header.
 
 ### Production
 
@@ -93,6 +116,18 @@ Shared DTO Library:
 - Both `frontend-cms` and `frontend-cram` are Vue 3 + Vite shells with the correct dependencies, TypeScript config, and aliasing back to `src/shared`.
 - Each app can evolve independently (separate `package.json`, scripts, and future env files) while still sharing DTOs/interfaces from the workspace.
 - When running against a remote backend, set `VITE_API_URL` in the corresponding frontend `.env` files (defaults to `http://localhost:3333` during development).
+
+### Frontend-CMS (Content Management)
+- **Authentication:** Required - uses Supabase Auth with email/password login
+- **Access:** Admin users only (create users in Supabase dashboard)
+- **API Client:** Uses `apiFetch()` helper that automatically adds auth tokens
+- **Port:** `http://localhost:4173`
+
+### Frontend-CRAM (Learner App)
+- **Authentication:** None - completely public
+- **Access:** Anyone can use the learning interface
+- **API:** Read-only access to situations and glosses
+- **Port:** `http://localhost:4174`
 
 ## Shared DTOs
 

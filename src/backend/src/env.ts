@@ -19,6 +19,8 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3333),
   DATABASE_URL: z.string().url(),
   CORS_ORIGIN: z.string().default("*"),
+  SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),
 });

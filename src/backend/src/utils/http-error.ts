@@ -22,3 +22,15 @@ export class BadRequestError extends HttpError {
     super(400, message);
   }
 }
+
+export class UnauthorizedError extends HttpError {
+  constructor(message: string) {
+    super(401, message);
+  }
+}
+
+export class ForbiddenError extends HttpError {
+  constructor(message: string) {
+    super(403, message);
+  }
+}

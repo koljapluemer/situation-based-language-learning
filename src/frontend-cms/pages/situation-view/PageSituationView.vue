@@ -11,13 +11,13 @@ import GlossModal from "../../features/gloss-manage/GlossModal.vue";
 import GlossTreeNode from "../../features/gloss-tree/GlossTreeNode.vue";
 import ModalGenerateUnderstandingChallenges from "../../features/ai-challenges/ModalGenerateUnderstandingChallenges.vue";
 import ModalGenerateExpressionChallenges from "../../features/ai-challenges/ModalGenerateExpressionChallenges.vue";
+import { apiPublicFetch, apiFetch } from "../../app/lib/api-client";
 
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 const queryClient = useQueryClient();
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3333";
 const situationId = route.params.id as string;
 
 const showGlossModalExpression = ref(false);
@@ -36,7 +36,7 @@ const { data: situation, isLoading, error } = useQuery({
   queryKey: situationQueryKey,
   queryFn: async ({ queryKey }) => {
     const [, id] = queryKey as [string, string];
-    const response = await fetch(`${API_BASE_URL}/situations/${id}`);
+    const response = await apiPublicFetch(`/situations/${id}`);
     if (!response.ok) {
       if (response.status === 404) {
         throw new Error("Situation not found");
@@ -121,9 +121,8 @@ async function handleGlossAdded(gloss: GlossDTO, type: "expression" | "understan
       ? "challengesOfExpressionIds"
       : "challengesOfUnderstandingTextIds";
 
-    const response = await fetch(`${API_BASE_URL}/situations/${situationId}`, {
+    const response = await apiFetch(`/situations/${situationId}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [field]: newIds }),
     });
 
@@ -152,9 +151,8 @@ const removeGlossMutation = useMutation({
       ? "challengesOfExpressionIds"
       : "challengesOfUnderstandingTextIds";
 
-    const response = await fetch(`${API_BASE_URL}/situations/${situationId}`, {
+    const response = await apiFetch(`/situations/${situationId}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [field]: newIds }),
     });
 
@@ -184,11 +182,8 @@ function handleEditSituation() {
 
 async function handleUpdateSituation(descriptions: LocalizedString[], imageLink?: string) {
   try {
-    const response = await fetch(`${API_BASE_URL}/situations/${situationId}`, {
+    const response = await apiFetch(`/situations/${situationId}`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify({
         descriptions,
         imageLink,

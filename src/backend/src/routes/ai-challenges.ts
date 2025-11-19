@@ -14,6 +14,7 @@ import {
   subscribeRunCompletion,
   subscribeRunLogs,
 } from "../services/ai/run-log-stream";
+import { authenticateRequest } from "../middleware/supabase-auth";
 
 const paramsSchema = z.object({ id: z.string().min(1) });
 
@@ -69,7 +70,9 @@ export function registerAIChallengeRoutes(app: FastifyInstance) {
    * Generate understanding challenges using agentic mode (tool-using agent).
    * Slower but more comprehensive, with autonomous decision-making.
    */
-  app.post("/ai/generate-understanding-challenges/agentic", async (request, reply) => {
+  app.post("/ai/generate-understanding-challenges/agentic", {
+    preHandler: authenticateRequest,
+    handler: async (request, reply) => {
     try {
       const payload = generateChallengesRequestSchema.parse(request.body);
 
@@ -118,6 +121,7 @@ export function registerAIChallengeRoutes(app: FastifyInstance) {
         details: stack,
       });
     }
+    }
   });
 
   /**
@@ -127,7 +131,9 @@ export function registerAIChallengeRoutes(app: FastifyInstance) {
    * Creates high-level communicative functions in native language that learners
    * need to express in target language.
    */
-  app.post("/ai/generate-expression-challenges/agentic", async (request, reply) => {
+  app.post("/ai/generate-expression-challenges/agentic", {
+    preHandler: authenticateRequest,
+    handler: async (request, reply) => {
     try {
       const payload = generateChallengesRequestSchema.parse(request.body);
 
@@ -176,6 +182,7 @@ export function registerAIChallengeRoutes(app: FastifyInstance) {
         details: stack,
       });
     }
+    }
   });
 
   /**
@@ -185,7 +192,9 @@ export function registerAIChallengeRoutes(app: FastifyInstance) {
    * Creates glosses with recursive contains relationships and attaches them
    * to either challengesOfExpression or challengesOfUnderstandingText array.
    */
-  app.post("/situations/:id/save-generated-challenges", async (request, reply) => {
+  app.post("/situations/:id/save-generated-challenges", {
+    preHandler: authenticateRequest,
+    handler: async (request, reply) => {
     try {
       const { id } = paramsSchema.parse(request.params);
       const payload = saveChallengesRequestSchema.parse(request.body);
@@ -245,6 +254,7 @@ export function registerAIChallengeRoutes(app: FastifyInstance) {
         success: false,
         error: message,
       });
+    }
     }
   });
 }
