@@ -28,5 +28,5 @@ databases:
   - name: sbll-db
     databaseName: sbll
     user: sbll_user
-    plan: starter
+    plan: basic-256mb
     region: frankfurt
