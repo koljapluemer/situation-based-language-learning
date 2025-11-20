@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { SituationService } from "../../../situation-service";
+import { SituationService } from "../../../situation-service.js";
 
 /**
  * Tool: Analyze situation context

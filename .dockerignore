@@ -1,0 +1,77 @@
+# Node modules
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+**/dist/
+build/
+**/build/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# CI/CD
+.github/
+
+# Documentation
+README.md
+DEPLOYMENT.md
+SUPABASE_AUTH_SETUP.md
+*.md
+
+# Test files
+**/__tests__/
+**/*.test.ts
+**/*.test.js
+**/*.spec.ts
+**/*.spec.js
+
+# Frontend source (not needed in backend container)
+src/frontend-cms/
+src/frontend-cram/
+
+# Development databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Prisma
+src/backend/prisma/dev.db
+
+# Fly.io
+fly.toml
+.fly/

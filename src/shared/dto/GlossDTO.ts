@@ -1,5 +1,5 @@
-import { GlossIdentifier } from "../LocalizedString";
-import { Note } from "../Note";
+import { GlossIdentifier } from "../LocalizedString.js";
+import { Note } from "../Note.js";
 
 export interface GlossReference extends GlossIdentifier {
     id: string;

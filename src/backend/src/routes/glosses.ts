@@ -1,13 +1,13 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { GlossService } from "../services/gloss-service";
+import { GlossService } from "../services/gloss-service.js";
 import {
   glossQuerySchema,
   glossSuggestSchema,
   glossUpdateSchema,
   glossWriteSchema,
-} from "../schemas/gloss-schema";
-import { authenticateRequest } from "../middleware/supabase-auth";
+} from "../schemas/gloss-schema.js";
+import { authenticateRequest } from "../middleware/supabase-auth.js";
 
 const paramsSchema = z.object({ id: z.string().cuid() });
 const service = new GlossService();

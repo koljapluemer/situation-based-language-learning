@@ -12,10 +12,13 @@ COPY tsconfig.base.json ./tsconfig.base.json
 COPY src/shared ./src/shared
 COPY src/backend ./src/backend
 COPY --from=deps /app/src/backend/node_modules ./src/backend/node_modules
+# Build shared package first (before pruning removes TypeScript)
+WORKDIR /app/src/shared
+RUN npm install && npm run build
 WORKDIR /app/src/backend
 RUN npm run prisma:generate
 RUN npm run build
-RUN npm prune --omit=dev
+RUN npm prune --omit=dev --ignore-scripts
 
 FROM node:20-bullseye AS runner
 ENV NODE_ENV=production

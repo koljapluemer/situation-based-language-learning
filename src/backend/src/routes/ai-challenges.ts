@@ -1,20 +1,20 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { AgenticGenerator, AgenticGenerationContext } from "../services/ai/agentic/agent";
-import { GlossCreationHelper } from "../services/ai/gloss-creation-helper";
-import { GlossService } from "../services/gloss-service";
-import { SituationService } from "../services/situation-service";
+import { AgenticGenerator, AgenticGenerationContext } from "../services/ai/agentic/agent.js";
+import { GlossCreationHelper } from "../services/ai/gloss-creation-helper.js";
+import { GlossService } from "../services/gloss-service.js";
+import { SituationService } from "../services/situation-service.js";
 import {
   generateChallengesRequestSchema,
   saveChallengesRequestSchema,
-} from "../schemas/ai-schema";
+} from "../schemas/ai-schema.js";
 import { LanguageCode } from "@sbl/shared";
-import { AI_CONFIG } from "../config/ai-config";
+import { AI_CONFIG } from "../config/ai-config.js";
 import {
   subscribeRunCompletion,
   subscribeRunLogs,
-} from "../services/ai/run-log-stream";
-import { authenticateRequest } from "../middleware/supabase-auth";
+} from "../services/ai/run-log-stream.js";
+import { authenticateRequest } from "../middleware/supabase-auth.js";
 
 const paramsSchema = z.object({ id: z.string().min(1) });
 

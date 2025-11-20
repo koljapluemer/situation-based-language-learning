@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { languageCodeSchema, noteSchema } from "./common";
+import { languageCodeSchema, noteSchema } from "./common.js";
 
 const idArray = () => z.array(z.string().cuid()).default([]);
 

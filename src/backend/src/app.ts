@@ -1,12 +1,12 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import { env } from "./env";
-import { registerHealthRoutes } from "./routes/health";
-import { registerGlossRoutes } from "./routes/glosses";
-import { registerSituationRoutes } from "./routes/situations";
-import { registerAIChallengeRoutes } from "./routes/ai-challenges";
-import { HttpError } from "./utils/http-error";
-import { prisma } from "./lib/prisma";
+import { env } from "./env.js";
+import { registerHealthRoutes } from "./routes/health.js";
+import { registerGlossRoutes } from "./routes/glosses.js";
+import { registerSituationRoutes } from "./routes/situations.js";
+import { registerAIChallengeRoutes } from "./routes/ai-challenges.js";
+import { HttpError } from "./utils/http-error.js";
+import { prisma } from "./lib/prisma.js";
 import { ZodError } from "zod";
 
 export function buildApp() {

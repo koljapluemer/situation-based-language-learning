@@ -1,6 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { GlossDTO, GlossReference, LanguageCode, Note } from "@sbl/shared";
-import { prisma as defaultClient } from "../lib/prisma";
+import { prisma as defaultClient } from "../lib/prisma.js";
 
 const relationSelect = { select: { id: true, language: true, content: true } } as const;
 

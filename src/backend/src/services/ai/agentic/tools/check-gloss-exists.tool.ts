@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { GlossService } from "../../../gloss-service";
+import { GlossService } from "../../../gloss-service.js";
 import { LanguageCode } from "@sbl/shared";
 
 /**

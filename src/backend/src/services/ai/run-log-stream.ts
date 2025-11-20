@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import type { AgenticGenerationLogEntry } from "./agentic/agent";
+import type { AgenticGenerationLogEntry } from "./agentic/agent.js";
 
 const emitter = new EventEmitter();
 emitter.setMaxListeners(0);

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { languageCodeSchema, noteSchema } from "./common";
+import { languageCodeSchema, noteSchema } from "./common.js";
 import { LanguageCode } from "@sbl/shared";
 
 /**

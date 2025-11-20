@@ -1,7 +1,7 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { env } from "../env";
-import { UnauthorizedError } from "../utils/http-error";
+import { env } from "../env.js";
+import { UnauthorizedError } from "../utils/http-error.js";
 
 // Extend FastifyRequest to include user property
 declare module "fastify" {

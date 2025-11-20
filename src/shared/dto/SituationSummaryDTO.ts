@@ -1,5 +1,5 @@
-import { LocalizedString } from "../LocalizedString"
-import { LanguageCode } from "../Language"
+import { LocalizedString } from "../LocalizedString.js"
+import { LanguageCode } from "../Language.js"
 
 export interface SituationSummaryDTO {
     id: string

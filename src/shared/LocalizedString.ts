@@ -1,4 +1,4 @@
-import { LanguageCode } from "./Language";
+import { LanguageCode } from "./Language.js";
 
 export interface LocalizedString {
     language: LanguageCode

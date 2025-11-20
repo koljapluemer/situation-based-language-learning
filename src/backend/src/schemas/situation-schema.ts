@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { languageCodeSchema, localizedStringSchema } from "./common";
+import { languageCodeSchema, localizedStringSchema } from "./common.js";
 
 const glossIdArray = z.array(z.string().cuid()).default([]);
 

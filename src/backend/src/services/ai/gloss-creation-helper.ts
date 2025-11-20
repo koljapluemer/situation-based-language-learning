@@ -1,7 +1,7 @@
 import { GlossDTO, LanguageCode } from "@sbl/shared";
-import { GlossService } from "../gloss-service";
-import { GlossPayload } from "../../schemas/ai-schema";
-import { GlossWriteInput, GlossUpdateInput } from "../../schemas/gloss-schema";
+import { GlossService } from "../gloss-service.js";
+import { GlossPayload } from "../../schemas/ai-schema.js";
+import { GlossWriteInput, GlossUpdateInput } from "../../schemas/gloss-schema.js";
 
 /**
  * Helper service for creating glosses with recursive contains relationships

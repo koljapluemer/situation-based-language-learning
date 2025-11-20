@@ -3,10 +3,10 @@ import { GlossDTO, LanguageCode } from "@sbl/shared";
 import {
   GlossWriteInput,
   GlossUpdateInput,
-} from "../schemas/gloss-schema";
-import { prisma as defaultClient } from "../lib/prisma";
-import { GlossResolver } from "./gloss-resolver";
-import { ConflictError, NotFoundError } from "../utils/http-error";
+} from "../schemas/gloss-schema.js";
+import { prisma as defaultClient } from "../lib/prisma.js";
+import { GlossResolver } from "./gloss-resolver.js";
+import { ConflictError, NotFoundError } from "../utils/http-error.js";
 
 export class GlossService {
   private readonly resolver: GlossResolver;

@@ -1,11 +1,11 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { ChatOpenAI } from "@langchain/openai";
-import { GlossService } from "../../../gloss-service";
-import { AI_CONFIG } from "../../../../config/ai-config";
-import { env } from "../../../../env";
+import { GlossService } from "../../../gloss-service.js";
+import { AI_CONFIG } from "../../../../config/ai-config.js";
+import { env } from "../../../../env.js";
 import { LanguageCode } from "@sbl/shared";
-import { languageCodeSchema } from "../../../../schemas/common";
+import { languageCodeSchema } from "../../../../schemas/common.js";
 
 const analyzeSchema = z.object({
   language: languageCodeSchema.describe("Language code of the gloss content"),

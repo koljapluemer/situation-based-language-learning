@@ -1,7 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { GlossService } from "../../../gloss-service";
-import { glossPayloadSchema } from "../../../../schemas/ai-schema";
+import { GlossService } from "../../../gloss-service.js";
+import { glossPayloadSchema } from "../../../../schemas/ai-schema.js";
 
 /**
  * Tool: Validate gloss structure

@@ -4,7 +4,7 @@ import { Sparkles, Trash2, AlertCircle } from "lucide-vue-next";
 import type { SituationDTO, LanguageCode } from "@sbl/shared";
 import { useToast } from "../../dumb/toasts/index";
 import ModalAgentRunLog from "./ModalAgentRunLog.vue";
-import { apiFetch } from "../../app/lib/api-client";
+import { apiFetch, API_BASE_URL } from "../../app/lib/api-client";
 
 interface GlossPayload {
   id?: string;

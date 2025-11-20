@@ -1,8 +1,8 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { GlossService } from "../../../gloss-service";
-import { GlossCreationHelper } from "../../gloss-creation-helper";
-import { languageCodeSchema } from "../../../../schemas/common";
+import { GlossService } from "../../../gloss-service.js";
+import { GlossCreationHelper } from "../../gloss-creation-helper.js";
+import { languageCodeSchema } from "../../../../schemas/common.js";
 import { LanguageCode } from "@sbl/shared";
 
 const translationPayloadSchema = z.object({

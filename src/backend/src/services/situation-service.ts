@@ -6,14 +6,14 @@ import {
   SituationDTO,
   SituationSummaryDTO,
 } from "@sbl/shared";
-import { prisma as defaultClient } from "../lib/prisma";
+import { prisma as defaultClient } from "../lib/prisma.js";
 import {
   SituationQueryInput,
   SituationUpdateInput,
   SituationWriteInput,
-} from "../schemas/situation-schema";
-import { GlossResolver } from "./gloss-resolver";
-import { ConflictError, NotFoundError } from "../utils/http-error";
+} from "../schemas/situation-schema.js";
+import { GlossResolver } from "./gloss-resolver.js";
+import { ConflictError, NotFoundError } from "../utils/http-error.js";
 
 const situationInclude = {
   challengesOfExpression: true,

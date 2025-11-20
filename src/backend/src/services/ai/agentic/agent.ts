@@ -3,20 +3,20 @@ import { GoogleGenerativeAI, SchemaType, type ObjectSchema } from "@google/gener
 import { randomUUID } from "node:crypto";
 import { LanguageCode, SituationDTO } from "@sbl/shared";
 import type { StructuredToolInterface } from "@langchain/core/tools";
-import { GlossPayload } from "../../../schemas/ai-schema";
-import { AIProvider, AI_CONFIG } from "../../../config/ai-config";
-import { env } from "../../../env";
-import { GlossService } from "../../gloss-service";
-import { SituationService } from "../../situation-service";
-import { GlossCreationHelper } from "../../ai/gloss-creation-helper";
-import { emitRunCompletion, emitRunLog } from "../run-log-stream";
-import { createSearchExistingGlossesTool } from "./tools/search-existing-glosses.tool";
-import { createGetRelatedGlossesTool } from "./tools/get-related-glosses.tool";
-import { createCheckGlossExistsTool } from "./tools/check-gloss-exists.tool";
-import { createAnalyzeSituationTool } from "./tools/analyze-situation.tool";
-import { createAnalyzeGlossStructureTool } from "./tools/analyze-gloss-structure.tool";
-import { createValidateGlossStructureTool } from "./tools/validate-gloss-structure.tool";
-import { createEnsureTranslationsTool } from "./tools/ensure-translations.tool";
+import { GlossPayload } from "../../../schemas/ai-schema.js";
+import { AIProvider, AI_CONFIG } from "../../../config/ai-config.js";
+import { env } from "../../../env.js";
+import { GlossService } from "../../gloss-service.js";
+import { SituationService } from "../../situation-service.js";
+import { GlossCreationHelper } from "../../ai/gloss-creation-helper.js";
+import { emitRunCompletion, emitRunLog } from "../run-log-stream.js";
+import { createSearchExistingGlossesTool } from "./tools/search-existing-glosses.tool.js";
+import { createGetRelatedGlossesTool } from "./tools/get-related-glosses.tool.js";
+import { createCheckGlossExistsTool } from "./tools/check-gloss-exists.tool.js";
+import { createAnalyzeSituationTool } from "./tools/analyze-situation.tool.js";
+import { createAnalyzeGlossStructureTool } from "./tools/analyze-gloss-structure.tool.js";
+import { createValidateGlossStructureTool } from "./tools/validate-gloss-structure.tool.js";
+import { createEnsureTranslationsTool } from "./tools/ensure-translations.tool.js";
 
 /**
  * Context for agentic generation
