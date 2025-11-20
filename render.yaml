@@ -4,9 +4,7 @@ services:
     runtime: docker
     plan: starter
     region: frankfurt
-    rootDir: src/backend
-    dockerfilePath: ./Dockerfile
-    dockerContext: ../..
+    dockerfilePath: ./src/backend/Dockerfile
     envVars:
       - key: NODE_ENV
         value: production
