@@ -20,7 +20,6 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
-    preDeployCommand: npx prisma migrate deploy --schema prisma/schema.prisma
 
 databases:
   - name: sbll-db
