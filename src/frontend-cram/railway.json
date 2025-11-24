@@ -1,0 +1,10 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "RAILPACK",
+    "buildCommand": "npm run shared:build && npm run build --workspace @sbl/frontend-cram"
+  },
+  "deploy": {
+    "staticPublishPath": "src/frontend-cram/dist"
+  }
+}

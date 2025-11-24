@@ -104,12 +104,15 @@ See `src/backend/API.md` for complete documentation.
 
 **Auth:** Protected routes require `Authorization: Bearer <supabase-jwt-token>` header.
 
-### Production
+### Production Deployment
 
-- Build the API image: `docker build -f src/backend/Dockerfile -t sbll-backend .`
-- Run migrations before deploy: `npm run prisma:migrate:deploy`
-- Provide `DATABASE_URL` via environment (managed Postgres recommended)
-- Start compiled server inside the container with `npm run backend:start`
+See `DEPLOYMENT.md` for complete Railway deployment instructions.
+
+**Quick overview:**
+- Deploy to Railway.app (no Docker needed)
+- 3 services: backend, frontend-cms, frontend-cram
+- PostgreSQL database managed by Railway
+- Auto-deploy from GitHub on push to `main`
 
 ## Frontend Notes
 

@@ -1,559 +1,320 @@
-# Deployment Guide: Render.com + Netlify
+# Railway Deployment Guide
 
-Complete step-by-step guide to deploy the Situation-Based Language Learning application.
+Complete guide to deploy the Situation-Based Language Learning application to Railway.
 
 ## Architecture Overview
 
-- **Render.com**: Backend API + PostgreSQL Database
-- **Netlify**: Frontend-CMS + Frontend-CRAM (static sites)
+- **Railway Services**:
+  - Backend API (Fastify + Prisma)
+  - Frontend-CMS (Vue 3 + Vite static site)
+  - Frontend-CRAM (Vue 3 + Vite static site)
+- **Railway PostgreSQL Database**: Native managed PostgreSQL
 - **Supabase**: Authentication only (no database)
 
 ---
 
 ## Prerequisites
 
-- GitHub account
-- Render.com account (https://dashboard.render.com/register)
-- Netlify account (https://app.netlify.com/signup)
-- Supabase project created (ID: `yxhprmlbuzfdsbauiwbk`)
-- Repository pushed to GitHub
+- GitHub account with this repository pushed
+- Railway account: https://railway.app
+- Supabase project for authentication (see `SUPABASE_AUTH_SETUP.md`)
 
 ---
 
-## Step 1: Supabase Setup (If Not Done)
+## Cost Estimate
 
-1. Go to https://supabase.com/dashboard/project/yxhprmlbuzfdsbauiwbk/settings/api
-2. Copy these values:
-   - **Project URL**: `https://yxhprmlbuzfdsbauiwbk.supabase.co`
-   - **anon public key**: For frontend-cms
-   - **service_role secret key**: For backend (keep secret!)
+### Hobby Plan (Recommended for development)
+- **$5/month subscription** (includes $5 usage credit)
+- Resource limits: 8 vCPU, 8GB RAM per service
+- If usage exceeds $5, you pay the difference
 
-3. Create admin user:
-   - Go to Authentication → Users → Add User
-   - Enter email and password
-   - Save credentials for CMS login
+### Pro Plan (For production/teams)
+- **$20/month subscription** (includes $20 usage credit)
+- Resource limits: 32 vCPU, 32GB RAM per service
+- Better for collaboration and higher traffic
+
+Official pricing: https://docs.railway.com/reference/pricing/plans
 
 ---
 
-## Step 2: Push render.yaml to GitHub
+## Step 1: Create Railway Project
 
-The `render.yaml` file in your repo root defines your infrastructure:
+1. Go to https://railway.app and sign up/login
+2. Click **"New Project"**
+3. Select **"Deploy from GitHub repo"**
+4. Authorize Railway to access your GitHub account
+5. Select the `situation-based-language-learning` repository
+6. Railway will detect the monorepo structure
 
-```yaml
-services:
-  - type: web
-    name: sbll-backend
-    runtime: docker
-    plan: starter
-    region: frankfurt
-    rootDir: src/backend
-    dockerfilePath: ./Dockerfile
-    dockerContext: ../..
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: PORT
-        value: 8080
-      - key: CORS_ORIGIN
-        sync: false
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-    preDeployCommand: npx prisma migrate deploy --schema prisma/schema.prisma
+---
 
-databases:
-  - name: sbll-db
-    databaseName: sbll
-    user: sbll_user
-    plan: starter
-    region: frankfurt
-```
+## Step 2: Create PostgreSQL Database
 
-**Ensure this file is committed and pushed to GitHub:**
+1. In your Railway project, click **"+ New"**
+2. Select **"Database"** → **"PostgreSQL"**
+3. Railway automatically creates the database
+4. Note: `DATABASE_URL` environment variable is automatically shared with all services
+
+---
+
+## Step 3: Deploy Backend Service
+
+### 3A. Create Backend Service
+
+1. Click **"+ New"** → **"GitHub Repo"**
+2. Select your repository
+3. Railway detects it's a monorepo
+4. Name the service: `backend`
+
+### 3B. Configure Backend
+
+1. Go to service **Settings** tab
+2. Set **Root Directory**: `/src/backend`
+3. Set **Watch Paths**: `/src/backend/**` and `/src/shared/**`
+4. Railway will use the `railway.json` config in `/src/backend/`
+
+### 3C. Environment Variables
+
+Go to **Variables** tab and add:
 
 ```bash
-git add render.yaml
-git commit -m "Add Render.com configuration"
-git push origin main
-```
-
----
-
-## Step 3: Create Render.com Account & Connect Repository
-
-1. Go to https://dashboard.render.com/register
-2. Sign up with GitHub (recommended for easier repo connection)
-3. Once logged in, click **"New +"** → **"Blueprint"**
-4. Connect your GitHub repository
-5. Select the repository: `situation-based-language-learning`
-6. Render auto-detects `render.yaml` and shows the infrastructure plan
-7. Review:
-   - **Web Service**: sbll-backend (Starter plan, $7/month)
-   - **PostgreSQL**: sbll-db (Starter plan, $7/month)
-   - **Total**: $14/month
-
-8. Click **"Apply"**
-
-Render will:
-- Create the PostgreSQL database
-- Create the web service
-- Set `DATABASE_URL` environment variable automatically
-- Start the first deployment
-
----
-
-## Step 4: Configure Environment Variables
-
-After the blueprint is applied, you need to set the secret environment variables (marked with `sync: false`).
-
-1. Go to **Dashboard** → **sbll-backend** service
-2. Click **"Environment"** tab
-3. Add the following environment variables:
-
-```bash
-CORS_ORIGIN=http://localhost:5173,http://localhost:5174
+NODE_ENV=production
+PORT=8080
+CORS_ORIGIN=http://localhost:4173,http://localhost:4174
 SUPABASE_URL=https://yxhprmlbuzfdsbauiwbk.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4aHBybWxidXpmZHNiYXVpd2JrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzU2NDczOCwiZXhwIjoyMDc5MTQwNzM4fQ.C1Gd3QAAlQLmQ2ArH2bov7Lm8CMVyepwGybuLes4ALg
-OPENAI_API_KEY=sk-...
-GEMINI_API_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+OPENAI_API_KEY=<optional>
+GEMINI_API_KEY=<optional>
 ```
 
-**Important:**
-- Set `CORS_ORIGIN` to localhost for initial testing
-- You'll update it with actual frontend URLs in Step 7
+**Notes:**
+- `DATABASE_URL` is automatically provided by Railway
+- Update `CORS_ORIGIN` with actual frontend URLs after deployment (Step 4 & 5)
+- Get Supabase keys from: https://supabase.com/dashboard/project/yxhprmlbuzfdsbauiwbk/settings/api
 
-4. Click **"Save Changes"**
-5. The service will automatically redeploy with the new variables
+### 3D. Generate Domain
 
----
-
-## Step 5: Monitor Initial Deployment
-
-1. Go to **Dashboard** → **sbll-backend**
-2. Click **"Logs"** tab
-3. Watch the deployment process:
-   - Building Docker image (2-5 minutes)
-   - Running pre-deploy command (Prisma migrations)
-   - Starting service
-
-4. Wait for the status to show **"Live"** (green dot)
-
-5. Note your backend URL: `https://sbll-backend.onrender.com`
-
-6. Test the health endpoint:
-   ```bash
-   curl https://sbll-backend.onrender.com/health
-   # Should return: {"status":"ok"}
-   ```
-
-**Troubleshooting:**
-- If deployment fails, check the **"Logs"** tab for errors
-- Common issues:
-  - Prisma migration errors (check database connection)
-  - Build errors (check Dockerfile and dependencies)
-  - Port configuration (ensure server listens on `process.env.PORT`)
+1. Go to **Settings** → **Networking**
+2. Click **"Generate Domain"**
+3. Copy the URL (e.g., `https://backend-production-xxxx.up.railway.app`)
+4. Test: `curl https://your-backend-url/health` → should return `{"status":"ok"}`
 
 ---
 
-## Step 6: Deploy Frontend-CMS to Netlify
+## Step 4: Deploy Frontend-CMS
 
-### 6A. Create Site
+### 4A. Create CMS Service
 
-1. Go to [Netlify Dashboard](https://app.netlify.com)
-2. Click **"Add new site"** → **"Import an existing project"**
-3. Connect to your GitHub repository
-4. Configure build settings:
-   - **Branch**: `main`
-   - **Base directory**: Leave blank
-   - **Build command**: `npm run shared:build && npm run cms:build`
-   - **Publish directory**: `src/frontend-cms/dist`
+1. Click **"+ New"** → **"GitHub Repo"**
+2. Select your repository
+3. Name the service: `frontend-cms`
 
-### 6B. Environment Variables
+### 4B. Configure CMS
 
-Go to **Site configuration** → **Environment variables** and add:
+1. Go to **Settings** tab
+2. Set **Root Directory**: `/src/frontend-cms`
+3. Set **Watch Paths**: `/src/frontend-cms/**` and `/src/shared/**`
+4. Railway will use the `railway.json` config in `/src/frontend-cms/`
+
+### 4C. Environment Variables
+
+Go to **Variables** tab and add:
 
 ```bash
 VITE_SUPABASE_URL=https://yxhprmlbuzfdsbauiwbk.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key-here
-VITE_API_URL=https://sbll-backend.onrender.com
+VITE_SUPABASE_ANON_KEY=<your-anon-key>
+VITE_API_URL=<your-backend-url-from-step-3>
 ```
 
-**Important:** Use your Render backend URL from Step 5.
+### 4D. Generate Domain
 
-### 6C. Deploy
+1. Go to **Settings** → **Networking**
+2. Click **"Generate Domain"**
+3. Copy the URL (e.g., `https://frontend-cms-production-xxxx.up.railway.app`)
 
-1. Click **"Deploy site"**
-2. Wait for build to complete (2-3 minutes)
-3. Note your CMS URL: `https://your-cms.netlify.app`
+---
 
-### 6D. Verify CMS
+## Step 5: Deploy Frontend-CRAM
 
+### 5A. Create CRAM Service
+
+1. Click **"+ New"** → **"GitHub Repo"**
+2. Select your repository
+3. Name the service: `frontend-cram`
+
+### 5B. Configure CRAM
+
+1. Go to **Settings** tab
+2. Set **Root Directory**: `/src/frontend-cram`
+3. Set **Watch Paths**: `/src/frontend-cram/**` and `/src/shared/**`
+4. Railway will use the `railway.json` config in `/src/frontend-cram/`
+
+### 5C. Environment Variables
+
+Go to **Variables** tab and add:
+
+```bash
+VITE_API_URL=<your-backend-url-from-step-3>
+```
+
+**Note:** CRAM doesn't need Supabase credentials (public app)
+
+### 5D. Generate Domain
+
+1. Go to **Settings** → **Networking**
+2. Click **"Generate Domain"**
+3. Copy the URL (e.g., `https://frontend-cram-production-xxxx.up.railway.app`)
+
+---
+
+## Step 6: Update Backend CORS
+
+Now that frontends are deployed, update backend CORS:
+
+1. Go to **backend** service → **Variables** tab
+2. Update `CORS_ORIGIN` with actual URLs:
+   ```
+   https://frontend-cms-production-xxxx.up.railway.app,https://frontend-cram-production-xxxx.up.railway.app
+   ```
+3. Backend will automatically redeploy
+
+**Important:** No spaces after commas
+
+---
+
+## Step 7: Verify Deployment
+
+### Backend Health Check
+```bash
+curl https://your-backend-url/health
+# Should return: {"status":"ok"}
+```
+
+### CMS Test
 1. Open your CMS URL
 2. Should redirect to `/login`
-3. Try logging in with Supabase admin credentials
-4. Check browser console for errors
+3. Login with Supabase admin credentials
+4. Create a test situation
+5. Verify it saves successfully
 
----
-
-## Step 7: Deploy Frontend-CRAM to Netlify
-
-### 7A. Create Site
-
-1. Go to Netlify Dashboard → **"Add new site"**
-2. Connect to same GitHub repository
-3. Configure build settings:
-   - **Branch**: `main`
-   - **Base directory**: Leave blank
-   - **Build command**: `npm run shared:build && npm run cram:build`
-   - **Publish directory**: `src/frontend-cram/dist`
-
-### 7B. Environment Variables
-
-Go to **Site configuration** → **Environment variables** and add:
-
-```bash
-VITE_API_URL=https://sbll-backend.onrender.com
-```
-
-**Note:** CRAM doesn't need Supabase credentials (public app).
-
-### 7C. Deploy
-
-1. Click **"Deploy site"**
-2. Wait for build to complete
-3. Note your CRAM URL: `https://your-cram.netlify.app`
-
-### 7D. Verify CRAM
-
+### CRAM Test
 1. Open your CRAM URL
-2. Should show landing page
-3. Try navigating to situations
-4. Check browser console for errors
-
----
-
-## Step 8: Update Backend CORS
-
-Now that frontends are deployed, update backend CORS to specific URLs:
-
-1. Go to **Render Dashboard** → **sbll-backend** → **"Environment"**
-2. Update `CORS_ORIGIN`:
-   ```
-   https://your-cms.netlify.app,https://your-cram.netlify.app
-   ```
-3. Click **"Save Changes"**
-
-**Important:**
-- No spaces after comma
-- Use your actual Netlify URLs
-- Backend will automatically redeploy with new CORS settings
-
----
-
-## Step 9: Final Verification
-
-### CMS End-to-End Test
-
-1. Open CMS: `https://your-cms.netlify.app`
-2. Login with admin credentials
-3. Create a new situation
-4. Verify it appears in the list
-5. Check Render logs: **Dashboard** → **sbll-backend** → **"Logs"**
-
-### CRAM End-to-End Test
-
-1. Open CRAM: `https://your-cram.netlify.app`
 2. Navigate to situations
-3. Verify situations load from API
+3. Should load data from backend API
 4. No login required
 
-### Check for Errors
-
-- **Browser console**: No CORS errors
-- **Render logs**: Requests from both frontends
-- **Network tab**: All API calls succeed (200/201 status)
-
----
-
-## Render CLI Commands Reference
-
-### Installation
-
-```bash
-# Install Render CLI
-npm install -g @render-oss/cli
-
-# Login
-render login
-```
-
-### Logs & Monitoring
-
-```bash
-# View logs (real-time)
-render logs -s sbll-backend
-
-# View service status
-render service get sbll-backend
-
-# List all services
-render services list
-```
-
-### Database Management
-
-```bash
-# Connect to database (psql)
-render psql sbll-db
-
-# Get database connection info
-render database get sbll-db
-```
-
-### Deployment
-
-```bash
-# Trigger manual deploy
-render deploy -s sbll-backend
-
-# Suspend service (stop temporarily)
-render service suspend sbll-backend
-
-# Resume service
-render service resume sbll-backend
-```
-
-### Environment Variables
-
-```bash
-# List environment variables
-render env-vars list -s sbll-backend
-
-# Set environment variable
-render env-vars set -s sbll-backend KEY=value
-
-# Delete environment variable
-render env-vars delete -s sbll-backend KEY
-```
+### Check Logs
+- Click on any service
+- View **Deployments** tab for build logs
+- View **Observability** tab for runtime logs
 
 ---
 
 ## Environment Variables Reference
 
-### Backend (Render.com)
+### Backend
 
-| Variable | Value | Notes |
-|----------|-------|-------|
-| `NODE_ENV` | `production` | Set in render.yaml |
-| `PORT` | `8080` | Set in render.yaml |
-| `DATABASE_URL` | Auto-set | By Render database connection |
-| `CORS_ORIGIN` | `https://cms.app,https://cram.app` | Update in Step 8 |
-| `SUPABASE_URL` | `https://xxx.supabase.co` | From Supabase dashboard |
-| `SUPABASE_SERVICE_ROLE_KEY` | `eyJhbGci...` | Secret key from Supabase |
-| `OPENAI_API_KEY` | `sk-...` | Optional (AI features) |
-| `GEMINI_API_KEY` | `...` | Optional (AI features) |
+| Variable | Example | Required | Notes |
+|----------|---------|----------|-------|
+| `NODE_ENV` | `production` | Yes | Set to production |
+| `PORT` | `8080` | Yes | Railway listens on this port |
+| `DATABASE_URL` | Auto-set | Yes | Provided by Railway PostgreSQL |
+| `CORS_ORIGIN` | `https://cms.app,https://cram.app` | Yes | Comma-separated frontend URLs |
+| `SUPABASE_URL` | `https://xxx.supabase.co` | Yes | From Supabase dashboard |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJhbGci...` | Yes | Secret key from Supabase |
+| `OPENAI_API_KEY` | `sk-...` | No | For AI features |
+| `GEMINI_API_KEY` | `...` | No | For AI features |
 
-### Frontend-CMS (Netlify)
+### Frontend-CMS
 
-| Variable | Value | Notes |
-|----------|-------|-------|
-| `VITE_SUPABASE_URL` | `https://xxx.supabase.co` | From Supabase dashboard |
-| `VITE_SUPABASE_ANON_KEY` | `eyJhbGci...` | Public anon key |
-| `VITE_API_URL` | `https://backend.onrender.com` | Your Render backend URL |
+| Variable | Example | Required | Notes |
+|----------|---------|----------|-------|
+| `VITE_SUPABASE_URL` | `https://xxx.supabase.co` | Yes | From Supabase dashboard |
+| `VITE_SUPABASE_ANON_KEY` | `eyJhbGci...` | Yes | Public anon key |
+| `VITE_API_URL` | `https://backend.railway.app` | Yes | Your Railway backend URL |
 
-### Frontend-CRAM (Netlify)
+### Frontend-CRAM
 
-| Variable | Value | Notes |
-|----------|-------|-------|
-| `VITE_API_URL` | `https://backend.onrender.com` | Your Render backend URL |
-
----
-
-## Troubleshooting
-
-### Backend Build Fails
-
-**Issue:** Docker build fails on Render
-
-**Solutions:**
-- Check build logs in Render dashboard
-- Verify Dockerfile path in render.yaml: `dockerfilePath: ./Dockerfile`
-- Ensure `dockerContext: ../..` is correct (repo root for shared package)
-- Check that all dependencies are in package.json
-- Test local Docker build: `docker build -f src/backend/Dockerfile .`
-
-### Backend Won't Start
-
-**Issue:** Service shows "Deploy failed"
-
-**Solutions:**
-- Check logs in Render dashboard
-- Verify `DATABASE_URL` is set automatically (check Environment tab)
-- Ensure migrations ran successfully (check pre-deploy logs)
-- Verify server listens on `process.env.PORT` (should be 8080)
-- Check for runtime errors in logs
-
-### Database Connection Fails
-
-**Issue:** Backend can't connect to database
-
-**Solutions:**
-- Verify database is running: Check **Dashboard** → **sbll-db** status
-- Check `DATABASE_URL` is set: **sbll-backend** → **"Environment"**
-- Ensure both backend and database are in same region (frankfurt)
-- Check database connection logs in Render dashboard
-
-### Prisma Migrations Fail
-
-**Issue:** Pre-deploy command fails
-
-**Solutions:**
-- Check pre-deploy logs in deployment details
-- Verify migration files exist in `src/backend/prisma/migrations/`
-- Run `npx prisma generate` locally to ensure Prisma Client is up to date
-- Check database is accessible during pre-deploy phase
-- Ensure DATABASE_URL format is correct
-
-### Frontend Build Fails
-
-**Issue:** Netlify build fails
-
-**Solutions:**
-- Check Netlify build logs
-- Verify build command includes `npm run shared:build &&`
-- Ensure Node version is 20 (check netlify.toml or set in Netlify UI)
-- Check all `VITE_` env vars are set in Netlify
-- Test local build: `npm run cms:build` or `npm run cram:build`
-
-### CORS Errors
-
-**Issue:** Browser shows CORS errors
-
-**Solutions:**
-- Check `CORS_ORIGIN` in Render: **sbll-backend** → **"Environment"**
-- Ensure frontend URLs are correct (no trailing slashes)
-- Verify URLs are comma-separated with no spaces
-- Check Render logs for CORS-related errors
-- Test with `CORS_ORIGIN=*` temporarily to isolate issue
-
-### CMS Login Fails
-
-**Issue:** Can't login to CMS
-
-**Solutions:**
-- Verify admin user created in Supabase dashboard
-- Check `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in Netlify
-- Check `SUPABASE_SERVICE_ROLE_KEY` in Render environment
-- Look for errors in browser console
-- Test Supabase connection separately
-
-### Slow First Request
-
-**Issue:** First request after inactivity is slow
-
-**Explanation:**
-- Render Starter plan keeps services running (no sleep)
-- If you're on Free plan: Services spin down after 15 min inactivity
-- First request takes 30-60 seconds to wake up
-
-**Solutions:**
-- Upgrade to Starter plan ($7/month) for always-on
-- Accept slow first request as free tier behavior
-- Use cron job to ping health endpoint every 10 minutes (workaround for free tier)
+| Variable | Example | Required | Notes |
+|----------|---------|----------|-------|
+| `VITE_API_URL` | `https://backend.railway.app` | Yes | Your Railway backend URL |
 
 ---
 
-## Render.com Pricing
+## Railway CLI (Optional)
 
-### Development/Testing (Free Tier)
-
-- Render Web Service: Free (with 15-min sleep)
-- Render PostgreSQL: Free for 90 days, then must upgrade
-- Netlify CMS: Free
-- Netlify CRAM: Free
-- **Total: $0/month for first 90 days**
-- **Limitation: Backend sleeps, database expires**
-
-### Production (Always-On)
-
-- Render Web Service (Starter): $7/month
-- Render PostgreSQL (Starter): $7/month
-- Netlify (2 sites): Free
-- **Total: $14/month**
-
----
-
-## Updating Deployments
-
-### Backend Updates
-
-1. Push code to `main` branch:
-   ```bash
-   git push origin main
-   ```
-2. Render auto-deploys on push
-3. Check deployment logs in Render dashboard
-4. If schema changes: Migrations run automatically via pre-deploy command
-
-### Frontend Updates
-
-1. Push code to `main` branch:
-   ```bash
-   git push origin main
-   ```
-2. Netlify auto-deploys from GitHub
-3. Check Netlify deploy logs
-4. Clear browser cache if needed
-
-### Database Migrations
-
-**For schema changes:**
-
-1. Develop locally:
-   ```bash
-   npm run prisma:migrate:dev
-   ```
-
-2. Commit migration files in `src/backend/prisma/migrations/`
-   ```bash
-   git add src/backend/prisma/migrations/
-   git commit -m "Add new migration"
-   ```
-
-3. Push to GitHub:
-   ```bash
-   git push origin main
-   ```
-
-4. Render automatically runs migrations via pre-deploy command
-
----
-
-## Manual Operations
-
-### Connect to Database Locally
+Install Railway CLI for local testing and advanced operations:
 
 ```bash
-# Get database connection string from Render dashboard
-# Dashboard → sbll-db → "Info" → "External Database URL"
+# Install CLI
+npm i -g @railway/cli
 
-# Connect with psql
-psql postgresql://sbll_user:password@dpg-xxxxx.frankfurt-postgres.render.com/sbll
+# Login
+railway login
 
-# Or set DATABASE_URL and use Prisma
-export DATABASE_URL="postgresql://sbll_user:password@dpg-xxxxx.frankfurt-postgres.render.com/sbll"
-npx prisma studio
+# Link to your project
+railway link
+
+# View logs
+railway logs
+
+# Run commands in Railway environment
+railway run npm run backend:dev
 ```
 
-### Run Migrations Manually
+Official docs: https://docs.railway.com/guides/cli
+
+---
+
+## How Deployments Work
+
+### Automatic Deployments
+- Push to `main` branch → Railway auto-deploys all services
+- Each service only rebuilds if files in its watch paths change
+- Migrations run automatically via backend's `startCommand`
+
+### Build Process
+1. Railway pulls latest code from GitHub
+2. Runs `npm install` at repo root (installs all workspaces)
+3. Executes `buildCommand` from each service's `railway.json`
+4. For backend: Runs shared build, Prisma generate, backend build
+5. For frontends: Runs shared build, then Vite build
+6. Backend: Starts with `startCommand` (runs migrations first)
+7. Frontends: Serves static files from `dist` folder
+
+### Configuration Files
+Each service has a `railway.json` that defines:
+- **Builder**: `RAILPACK` (Railway's native builder, no Docker needed)
+- **Build Command**: How to build the service
+- **Start Command** (backend only): How to run the service
+- **Static Publish Path** (frontends only): Where static files are located
+
+---
+
+## Database Management
+
+### Connecting Locally
+
+1. Get database connection string:
+   - Go to **PostgreSQL service** → **Variables** tab
+   - Copy `DATABASE_URL` value
+
+2. Connect with psql:
+   ```bash
+   psql "postgresql://postgres:password@region.railway.app:5432/railway"
+   ```
+
+3. Or use Prisma Studio:
+   ```bash
+   export DATABASE_URL="postgresql://..."
+   cd src/backend
+   npx prisma studio
+   ```
+
+### Running Migrations Manually
 
 ```bash
-# Get database connection string (see above)
+# Set DATABASE_URL from Railway
 export DATABASE_URL="postgresql://..."
 
 # Run migrations
@@ -561,17 +322,132 @@ cd src/backend
 npx prisma migrate deploy --schema prisma/schema.prisma
 ```
 
-### View Database Contents
+**Note:** Migrations run automatically on backend startup, so manual runs are rarely needed.
 
-```bash
-# Option 1: Prisma Studio (local)
-export DATABASE_URL="postgresql://..."
-cd src/backend
-npx prisma studio
+### Database Backups
 
-# Option 2: psql (command line)
-psql $DATABASE_URL
-```
+Railway provides automatic daily backups:
+1. Go to **PostgreSQL service** → **Backups** tab
+2. Download backups or restore to a point in time
+
+---
+
+## Troubleshooting
+
+### Build Fails
+
+**Issue:** Service shows "Build failed"
+
+**Solutions:**
+- Check **Deployments** tab for build logs
+- Verify `railway.json` configuration is correct
+- Ensure all dependencies are in `package.json`
+- Test build locally: `npm run shared:build && npm run backend:build`
+- Check that root directory and watch paths are set correctly
+
+### Backend Won't Start
+
+**Issue:** Backend deploys but crashes
+
+**Solutions:**
+- Check **Observability** logs for errors
+- Verify `DATABASE_URL` exists in Variables tab
+- Ensure migrations ran successfully (check startup logs)
+- Verify server listens on `process.env.PORT`
+- Check Prisma Client is generated
+
+### Database Connection Fails
+
+**Issue:** Backend can't connect to database
+
+**Solutions:**
+- Verify PostgreSQL service is running
+- Check `DATABASE_URL` format is correct
+- Ensure backend and database are in same project
+- Look for connection errors in logs
+
+### Prisma Migrations Fail
+
+**Issue:** Migrations fail on startup
+
+**Solutions:**
+- Check migration files exist in `src/backend/prisma/migrations/`
+- Verify `DATABASE_URL` is accessible
+- Run `npx prisma generate` locally to test
+- Check logs for specific Prisma errors
+- Ensure `prisma:migrate:deploy` command is in `startCommand`
+
+### Frontend Build Fails
+
+**Issue:** Frontend deployment fails
+
+**Solutions:**
+- Verify `buildCommand` includes `npm run shared:build`
+- Check that Node version is compatible (20+)
+- Ensure all `VITE_` env vars are set
+- Test local build: `npm run cms:build` or `npm run cram:build`
+- Check build logs for TypeScript errors
+
+### CORS Errors
+
+**Issue:** Browser shows CORS errors when accessing API
+
+**Solutions:**
+- Verify `CORS_ORIGIN` in backend Variables tab
+- Ensure frontend URLs are exact (no trailing slashes)
+- URLs must be comma-separated with no spaces
+- Check backend logs for CORS-related messages
+- Temporarily set `CORS_ORIGIN=*` to test (not for production!)
+
+### CMS Login Fails
+
+**Issue:** Can't login to CMS
+
+**Solutions:**
+- Verify admin user exists in Supabase dashboard
+- Check `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in CMS variables
+- Verify `SUPABASE_SERVICE_ROLE_KEY` in backend variables
+- Look for errors in browser console
+- Test Supabase connection separately
+
+### Static Site 404 Errors
+
+**Issue:** Frontend shows 404 for routes
+
+**Solutions:**
+- Ensure Vue Router is in "history" mode for SPA routing
+- Check that `staticPublishPath` points to correct `dist` folder
+- Add a `_redirects` file if using client-side routing
+- Verify build actually produces `dist` folder
+
+---
+
+## Updating Deployments
+
+### Code Changes
+1. Push to `main` branch:
+   ```bash
+   git push origin main
+   ```
+2. Railway auto-deploys affected services
+3. Watch logs in Railway dashboard
+
+### Schema Changes
+1. Create migration locally:
+   ```bash
+   npm run prisma:migrate:dev
+   ```
+2. Commit migration files:
+   ```bash
+   git add src/backend/prisma/migrations/
+   git commit -m "Add migration"
+   git push origin main
+   ```
+3. Backend auto-deploys and runs migrations
+
+### Environment Variables
+1. Update in Railway dashboard → Service → **Variables**
+2. Service automatically redeploys with new values
 
 ---
 
@@ -580,26 +456,44 @@ psql $DATABASE_URL
 Before going live:
 
 - [ ] Supabase admin user created
-- [ ] Backend deployed: `https://sbll-backend.onrender.com/health` returns OK
-- [ ] Database migrations applied (automatic via pre-deploy)
+- [ ] PostgreSQL database running in Railway
+- [ ] Backend deployed: `/health` endpoint returns OK
+- [ ] Backend environment variables set (including Supabase keys)
 - [ ] Frontend-CMS deployed and login works
 - [ ] Frontend-CRAM deployed and loads data
-- [ ] CORS configured with actual frontend URLs
-- [ ] All environment variables/secrets set correctly
+- [ ] CORS configured with actual frontend URLs (no `*`)
+- [ ] Watch paths configured to prevent unnecessary rebuilds
+- [ ] Custom domains configured (optional)
+- [ ] Database backups enabled (automatic in Railway)
 - [ ] No errors in browser console
-- [ ] No errors in Render logs
-- [ ] End-to-end test passed (create content in CMS, view in CRAM)
+- [ ] No errors in Railway service logs
+- [ ] End-to-end test: Create content in CMS, view in CRAM
 
 ---
 
-## Support
+## Custom Domains (Optional)
 
-- **Render Docs**: https://render.com/docs
-- **Render Community**: https://community.render.com
-- **Netlify Docs**: https://docs.netlify.com
+To use your own domains instead of Railway-generated URLs:
+
+1. Go to service → **Settings** → **Networking**
+2. Click **"Custom Domain"**
+3. Enter your domain (e.g., `api.yourdomain.com`)
+4. Add DNS records shown by Railway to your DNS provider
+5. Railway automatically provisions SSL certificates
+
+Repeat for each service (backend, CMS, CRAM).
+
+---
+
+## Resources
+
+- **Railway Docs**: https://docs.railway.com
+- **Railway Monorepo Guide**: https://docs.railway.com/guides/monorepo
+- **Railway CLI**: https://docs.railway.com/guides/cli
 - **Supabase Docs**: https://supabase.com/docs
+- **Prisma Deployment**: https://www.prisma.io/docs/orm/prisma-client/deployment
 
-For application-specific issues, check:
-- `README.md` - Project overview
+For application-specific setup:
+- `README.md` - Project overview and local development
 - `src/backend/API.md` - API documentation
-- `SUPABASE_AUTH_SETUP.md` - Auth configuration
+- `SUPABASE_AUTH_SETUP.md` - Authentication configuration
