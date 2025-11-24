@@ -2,7 +2,9 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "RAILPACK",
-    "buildCommand": "npm run shared:build && npm run build --workspace @sbl/frontend-cram"
+    "nixpacksConfigPath": "/src/frontend-cram/railway.json",
+    "watchPatterns": ["/src/frontend-cram/**", "/src/shared/**"],
+    "buildCommand": "npm install && npm run shared:build && npm run build --workspace @sbl/frontend-cram"
   },
   "deploy": {
     "staticPublishPath": "src/frontend-cram/dist"
