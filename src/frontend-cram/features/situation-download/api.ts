@@ -1,6 +1,5 @@
 import type { SituationDTO, SituationSummaryDTO, LanguageCode, GlossDTO } from '@sbl/shared';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3333';
+import { API_BASE_URL } from '../../app/api-base';
 
 /**
  * Fetch situation summaries for a specific target language

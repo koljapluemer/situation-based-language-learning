@@ -3,14 +3,16 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { LANGUAGES, type LanguageCode, type SituationSummaryDTO } from '@sbl/shared';
 import { getKnownLanguages } from '../../dumb/known-languages-storage';
-import { downloadSituation, downloadAllSituations } from '../../features/situation-download';
+import {
+  fetchSituationSummaries,
+  downloadSituation,
+  downloadAllSituations
+} from '../../features/situation-download';
 import { situationExists } from '../../entities/situation';
 import { Download } from 'lucide-vue-next';
 
 const route = useRoute();
 const router = useRouter();
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3333';
 
 const situations = ref<SituationSummaryDTO[]>([]);
 const isLoading = ref(false);
@@ -47,14 +49,7 @@ async function fetchSituations(targetLanguage: LanguageCode) {
   error.value = null;
 
   try {
-    const response = await fetch(`${API_BASE_URL}/situations/summary?targetLanguage=${targetLanguage}`);
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch situations: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const fetched: SituationSummaryDTO[] = data.data || [];
+    const fetched = await fetchSituationSummaries(targetLanguage);
     const userNativeLanguages = getKnownLanguages();
     if (userNativeLanguages.length) {
       const allowed = new Set(userNativeLanguages);

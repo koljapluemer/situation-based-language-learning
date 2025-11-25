@@ -118,7 +118,7 @@ See `DEPLOYMENT.md` for complete Railway deployment instructions.
 
 - Both `frontend-cms` and `frontend-cram` are Vue 3 + Vite shells with the correct dependencies, TypeScript config, and aliasing back to `src/shared`.
 - Each app can evolve independently (separate `package.json`, scripts, and future env files) while still sharing DTOs/interfaces from the workspace.
-- When running against a remote backend, set `VITE_API_URL` in the corresponding frontend `.env` files (defaults to `http://localhost:3333` during development).
+- Frontends require a single env var for backend calls: set `VITE_API_URL` in each frontend’s `.env` file (e.g., `http://localhost:3333` for local dev, your deployed backend in production). There is no fallback.
 
 ### Frontend-CMS (Content Management)
 - **Authentication:** Required - uses Supabase Auth with email/password login

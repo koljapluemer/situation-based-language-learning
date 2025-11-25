@@ -4,8 +4,7 @@ import type { GlossDTO, LanguageCode, Note } from "@sbl/shared";
 import { LANGUAGES } from "@sbl/shared";
 import LanguageSelect from "../../dumb/LanguageSelect.vue";
 import { useToast } from "../../dumb/toasts";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3333";
+import { API_BASE_URL } from "../../app/lib/api-base";
 
 const props = defineProps<{
   show: boolean;
